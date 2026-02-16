@@ -34,12 +34,12 @@
   "author": "Yunus Emre Gurlu <yunusemregurlu@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/agent-scope.git"
+    "url": "git+https://github.com/yunusemrgrl/agent-scope.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/agent-scope/issues"
+    "url": "https://github.com/yunusemrgrl/agent-scope/issues"
   },
-  "homepage": "https://github.com/yourusername/agent-scope#readme",
+  "homepage": "https://github.com/yunusemrgrl/agent-scope#readme",
   "license": "MIT",
   "dependencies": {
     "@fastify/cors": "^9.0.1",
