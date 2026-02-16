@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, RefreshCw, Copy, Download, Check, ChevronRight, ChevronDown } from 'lucide-react';
+import { Search, RefreshCw, Copy, Download, Check, ChevronRight, ChevronDown, Brain, Wrench, Eye, AlertCircle, Clock, Bot, FileText, GitCommit } from 'lucide-react';
 import type { SnapshotResponse, ComputedTask } from '@/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -12,7 +12,7 @@ export default function Dashboard() {
   const [selectedTask, setSelectedTask] = useState<ComputedTask | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedTaskId, setCopiedTaskId] = useState(false);
-  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [expandedSlices, setExpandedSlices] = useState<Set<string>>(new Set());
 
   const fetchSnapshot = async () => {
     setLoading(true);
@@ -43,14 +43,13 @@ export default function Dashboard() {
     }
   };
 
-  const toggleTaskExpand = (taskId: string) => {
-    const newExpanded = new Set(expandedTasks);
-    if (newExpanded.has(taskId)) {
-      newExpanded.delete(taskId);
-    } else {
-      newExpanded.add(taskId);
-    }
-    setExpandedTasks(newExpanded);
+  const toggleSlice = (sliceId: string) => {
+    setExpandedSlices(prev => {
+      const next = new Set(prev);
+      if (next.has(sliceId)) next.delete(sliceId);
+      else next.add(sliceId);
+      return next;
+    });
   };
 
   const getStatusColor = (status: string) => {
@@ -123,6 +122,28 @@ export default function Dashboard() {
     return snapshot.tasks.filter(t => t.dependsOn.includes(taskId));
   };
 
+  // Agent activity stats
+  const agentStats = snapshot.tasks.reduce((acc, task) => {
+    if (task.lastEvent) {
+      const agent = task.lastEvent.agent;
+      if (!acc[agent]) acc[agent] = { done: 0, failed: 0, totalDuration: 0, taskCount: 0 };
+      acc[agent].taskCount++;
+      if (task.lastEvent.status === 'DONE') acc[agent].done++;
+      if (task.lastEvent.status === 'FAILED') acc[agent].failed++;
+      const dur = task.lastEvent.meta?.duration;
+      if (typeof dur === 'number') acc[agent].totalDuration += dur;
+    }
+    return acc;
+  }, {} as Record<string, { done: number; failed: number; totalDuration: number; taskCount: number }>);
+
+  // Last activity timestamp
+  const lastActivity = snapshot.tasks
+    .filter(t => t.lastEvent)
+    .sort((a, b) => b.lastEvent!.timestamp.localeCompare(a.lastEvent!.timestamp))[0]?.lastEvent;
+
+  // Areas breakdown
+  const areas = [...new Set(snapshot.tasks.map(t => t.area))];
+
   return (
     <div className="h-screen bg-background flex overflow-hidden">
       {/* Left Sidebar */}
@@ -163,10 +184,23 @@ export default function Dashboard() {
           <div className="p-3 space-y-3">
             {Object.entries(tasksBySlice).map(([sliceId, tasks]) => (
               <div key={sliceId} className="space-y-2">
-                <div className="px-2 py-1.5 bg-muted rounded text-xs font-semibold text-muted-foreground">
-                  {sliceId} • {tasks.length} tasks
-                </div>
-                {tasks.map(task => (
+                <button
+                  onClick={() => toggleSlice(sliceId)}
+                  className="w-full flex items-center justify-between px-2 py-1.5 bg-muted rounded text-xs font-semibold text-muted-foreground hover:bg-muted/80 transition-colors"
+                >
+                  <div className="flex items-center gap-1.5">
+                    {expandedSlices.has(sliceId) ? (
+                      <ChevronDown className="size-3.5" />
+                    ) : (
+                      <ChevronRight className="size-3.5" />
+                    )}
+                    <span>{sliceId} • {tasks.length} tasks</span>
+                  </div>
+                  <span className="text-muted-foreground/60">
+                    {tasks.filter(t => t.status === 'DONE').length}/{tasks.length}
+                  </span>
+                </button>
+                {expandedSlices.has(sliceId) && tasks.map(task => (
                   <button
                     key={task.id}
                     onClick={() => setSelectedTask(task)}
@@ -183,7 +217,15 @@ export default function Dashboard() {
                       </span>
                     </div>
                     <div className="text-sm text-muted-foreground line-clamp-2">{task.description}</div>
-                    <div className="text-xs text-muted-foreground/60 mt-1">{task.area}</div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs text-muted-foreground/60">{task.area}</span>
+                      {typeof task.lastEvent?.meta?.commit === 'string' && (
+                        <span className="flex items-center gap-1 text-[10px] text-chart-4/70 font-mono">
+                          <GitCommit className="size-2.5" />
+                          {String(task.lastEvent.meta.commit).slice(0, 7)}
+                        </span>
+                      )}
+                    </div>
                   </button>
                 ))}
               </div>
@@ -299,25 +341,64 @@ export default function Dashboard() {
 
                     {selectedTask.lastEvent && (
                       <div>
-                        <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Last Event</h4>
-                        <div className="bg-card rounded-lg p-4 space-y-2 text-sm border border-border">
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Agent:</span>
-                            <span className="text-foreground font-mono">{selectedTask.lastEvent.agent}</span>
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Execution</h4>
+                        <div className="bg-card rounded-lg p-4 space-y-3 text-sm border border-border">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-foreground font-mono">{selectedTask.lastEvent.agent}</span>
+                              <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getStatusColor(selectedTask.lastEvent.status)}`}>
+                                {selectedTask.lastEvent.status}
+                              </span>
+                            </div>
+                            <span className="text-muted-foreground text-xs">{new Date(selectedTask.lastEvent.timestamp).toLocaleString()}</span>
                           </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Time:</span>
-                            <span className="text-foreground">{new Date(selectedTask.lastEvent.timestamp).toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Status:</span>
-                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getStatusColor(selectedTask.lastEvent.status)}`}>
-                              {selectedTask.lastEvent.status}
-                            </span>
-                          </div>
-                          {selectedTask.lastEvent.meta && (
-                            <div className="mt-3 pt-3 border-t border-border">
-                              <span className="text-muted-foreground text-xs block mb-2">Metadata:</span>
+
+                          {selectedTask.lastEvent.meta?.duration != null && (
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Clock className="size-3" />
+                                {String(selectedTask.lastEvent.meta.duration)}s
+                              </span>
+                              {selectedTask.lastEvent.meta.stepCount != null && (
+                                <span>{String(selectedTask.lastEvent.meta.stepCount)} steps</span>
+                              )}
+                            </div>
+                          )}
+
+                          {typeof selectedTask.lastEvent.meta?.commit === 'string' && (
+                            <div className="flex items-center gap-2 px-3 py-2 bg-background rounded-md">
+                              <GitCommit className="size-3.5 text-chart-4 shrink-0" />
+                              <code className="text-xs text-chart-4 font-mono">{String(selectedTask.lastEvent.meta.commit).slice(0, 7)}</code>
+                              <span className="text-xs text-muted-foreground truncate">
+                                {String(selectedTask.lastEvent.meta.commitMsg || '')}
+                              </span>
+                            </div>
+                          )}
+
+                          {Array.isArray(selectedTask.lastEvent.meta?.steps) && (
+                            <div className="mt-2 pt-3 border-t border-border space-y-1">
+                              {(selectedTask.lastEvent.meta.steps as Array<{type: string; name: string; summary: string; duration: number; timestamp: string}>).map((step, i) => (
+                                <div key={i} className="flex items-start gap-2 py-1.5 px-2 rounded hover:bg-background/50">
+                                  <div className="mt-0.5">
+                                    {step.type === 'thought' && <Brain className="size-3.5 text-chart-4" />}
+                                    {step.type === 'tool_call' && <Wrench className="size-3.5 text-chart-1" />}
+                                    {step.type === 'observation' && <Eye className="size-3.5 text-chart-2" />}
+                                    {step.type === 'error' && <AlertCircle className="size-3.5 text-chart-5" />}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="text-xs font-medium text-foreground truncate">{step.name}</span>
+                                      <span className="text-[10px] text-muted-foreground/60 shrink-0">{step.duration}ms</span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground/80 truncate">{step.summary}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {selectedTask.lastEvent.meta && !Array.isArray(selectedTask.lastEvent.meta.steps) && (
+                            <div className="mt-2 pt-3 border-t border-border">
                               <pre className="text-xs text-muted-foreground bg-background p-2 rounded overflow-auto">
                                 {JSON.stringify(selectedTask.lastEvent.meta, null, 2)}
                               </pre>
@@ -393,6 +474,69 @@ export default function Dashboard() {
                             </div>
                           </div>
                         ))}
+                      </div>
+                    </div>
+
+                    {/* Agent Activity */}
+                    {Object.keys(agentStats).length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3">Agent Activity</h4>
+                        <div className="space-y-2">
+                          {Object.entries(agentStats).map(([agent, stats]) => (
+                            <div key={agent} className="bg-card border border-border rounded-lg p-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <Bot className="size-4 text-chart-4" />
+                                  <span className="font-mono text-sm text-foreground">{agent}</span>
+                                </div>
+                                <span className="text-xs text-muted-foreground">{stats.taskCount} tasks</span>
+                              </div>
+                              <div className="flex gap-3 text-xs">
+                                <span className="text-chart-2">{stats.done} done</span>
+                                {stats.failed > 0 && <span className="text-chart-5">{stats.failed} failed</span>}
+                                {stats.totalDuration > 0 && (
+                                  <span className="text-muted-foreground flex items-center gap-1">
+                                    <Clock className="size-3" />
+                                    {stats.totalDuration.toFixed(1)}s total
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Data Sources & Meta */}
+                    <div>
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3">Data Sources</h4>
+                      <div className="bg-card border border-border rounded-lg p-4 space-y-3 text-sm">
+                        <div className="flex items-center gap-2">
+                          <FileText className="size-3.5 text-chart-4" />
+                          <span className="text-muted-foreground">Queue:</span>
+                          <span className="font-mono text-foreground text-xs">queue.md</span>
+                          <span className="text-xs text-muted-foreground/60 ml-auto">{areas.length} areas</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <FileText className="size-3.5 text-chart-1" />
+                          <span className="text-muted-foreground">Log:</span>
+                          <span className="font-mono text-foreground text-xs">execution.log</span>
+                          <span className="text-xs text-muted-foreground/60 ml-auto">
+                            {snapshot.tasks.filter(t => t.lastEvent).length} events
+                          </span>
+                        </div>
+                        {data.meta && (
+                          <div className="pt-2 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Generated at</span>
+                            <span>{new Date(data.meta.generatedAt).toLocaleString()}</span>
+                          </div>
+                        )}
+                        {lastActivity && (
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Last activity</span>
+                            <span>{new Date(lastActivity.timestamp).toLocaleString()}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
