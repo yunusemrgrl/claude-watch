@@ -55,40 +55,50 @@ export default function Dashboard() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'DONE': return 'bg-[#22c55e]/20 text-[#22c55e]';
-      case 'FAILED': return 'bg-[#ef4444]/20 text-[#ef4444]';
-      case 'BLOCKED': return 'bg-[#f59e0b]/20 text-[#f59e0b]';
-      case 'READY': return 'bg-[#3b82f6]/20 text-[#3b82f6]';
-      default: return 'bg-gray-500/20 text-gray-500';
+      case 'DONE': return 'bg-chart-2/20 text-chart-2';
+      case 'FAILED': return 'bg-chart-5/20 text-chart-5';
+      case 'BLOCKED': return 'bg-chart-3/20 text-chart-3';
+      case 'READY': return 'bg-chart-1/20 text-chart-1';
+      default: return 'bg-muted text-muted-foreground';
+    }
+  };
+
+  const getStatusDotColor = (status: string) => {
+    switch (status) {
+      case 'DONE': return 'bg-chart-2';
+      case 'FAILED': return 'bg-chart-5';
+      case 'BLOCKED': return 'bg-chart-3';
+      case 'READY': return 'bg-chart-1';
+      default: return 'bg-muted-foreground';
     }
   };
 
   if (loading && !data) {
     return (
-      <div className="h-screen bg-[#141414] flex items-center justify-center">
-        <div className="text-gray-400 font-['JetBrains_Mono']">Loading...</div>
+      <div className="h-screen bg-background flex items-center justify-center">
+        <div className="text-muted-foreground">Loading...</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="h-screen bg-[#141414] flex items-center justify-center">
-        <div className="text-red-500 font-['JetBrains_Mono']">Error: {error}</div>
+      <div className="h-screen bg-background flex items-center justify-center">
+        <div className="text-destructive-foreground">Error: {error}</div>
       </div>
     );
   }
 
   if (!data || !data.snapshot) {
     return (
-      <div className="h-screen bg-[#141414] p-8">
+      <div className="h-screen bg-background p-8">
         <div className="max-w-4xl mx-auto">
-          <div className="bg-red-950 border border-red-800 rounded-lg p-6 font-['JetBrains_Mono']">
-            <h2 className="text-xl font-bold text-red-300 mb-4">Queue Parse Errors</h2>
+          <div className="bg-destructive/10 border border-destructive rounded-lg p-6">
+            <h2 className="text-xl font-bold text-destructive-foreground mb-4">Queue Parse Errors</h2>
             <div className="space-y-2">
               {data?.queueErrors?.map((err, i) => (
-                <div key={i} className="text-red-200 text-sm">{err}</div>
-              )) || <div className="text-red-200 text-sm">No data available</div>}
+                <div key={i} className="text-destructive-foreground text-sm">{err}</div>
+              )) || <div className="text-destructive-foreground text-sm">No data available</div>}
             </div>
           </div>
         </div>
@@ -114,36 +124,36 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="h-screen bg-[#141414] flex overflow-hidden font-['JetBrains_Mono']">
+    <div className="h-screen bg-background flex overflow-hidden">
       {/* Left Sidebar */}
-      <div className="w-[25%] min-w-[300px] bg-[#1e1e1e] border-r border-[#2a2a2a] flex flex-col">
+      <div className="w-[25%] min-w-[300px] bg-sidebar border-r border-sidebar-border flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b border-[#2a2a2a]">
+        <div className="p-4 border-b border-sidebar-border">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-baseline gap-2">
-              <h1 className="text-lg font-semibold text-gray-100">agent-scope</h1>
-              <span className="text-xs text-gray-500 bg-[#2a2a2a] px-2 py-0.5 rounded">
+              <h1 className="text-lg font-semibold text-foreground">agent-scope</h1>
+              <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
                 v0.1
               </span>
             </div>
             <button
               onClick={fetchSnapshot}
               disabled={loading}
-              className="p-1.5 rounded hover:bg-[#2a2a2a] transition-colors disabled:opacity-50"
+              className="p-1.5 rounded hover:bg-sidebar-accent transition-colors disabled:opacity-50"
             >
-              <RefreshCw className={`size-4 text-gray-400 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`size-4 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
 
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <input
               type="text"
               placeholder="Filter tasks..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#141414] border border-[#2a2a2a] rounded-lg pl-9 pr-3 py-2 text-sm text-gray-300 placeholder-gray-600 focus:outline-none focus:border-[#3a3a3a]"
+              className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:border-ring"
             />
           </div>
         </div>
@@ -153,7 +163,7 @@ export default function Dashboard() {
           <div className="p-3 space-y-3">
             {Object.entries(tasksBySlice).map(([sliceId, tasks]) => (
               <div key={sliceId} className="space-y-2">
-                <div className="px-2 py-1.5 bg-[#2a2a2a] rounded text-xs font-semibold text-gray-400">
+                <div className="px-2 py-1.5 bg-muted rounded text-xs font-semibold text-muted-foreground">
                   {sliceId} • {tasks.length} tasks
                 </div>
                 {tasks.map(task => (
@@ -162,18 +172,18 @@ export default function Dashboard() {
                     onClick={() => setSelectedTask(task)}
                     className={`w-full text-left p-3 rounded-lg border transition-colors ${
                       selectedTask?.id === task.id
-                        ? 'bg-[#2a2a2a] border-[#3a3a3a]'
-                        : 'bg-[#1a1a1a] border-[#2a2a2a] hover:bg-[#252525]'
+                        ? 'bg-accent border-ring'
+                        : 'bg-card border-border hover:bg-accent/50'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm font-mono text-gray-300">{task.id}</span>
+                      <span className="text-sm font-mono text-foreground">{task.id}</span>
                       <span className={`text-xs px-2 py-0.5 rounded font-semibold ${getStatusColor(task.status)}`}>
                         {task.status}
                       </span>
                     </div>
-                    <div className="text-sm text-gray-400 line-clamp-2">{task.description}</div>
-                    <div className="text-xs text-gray-600 mt-1">{task.area}</div>
+                    <div className="text-sm text-muted-foreground line-clamp-2">{task.description}</div>
+                    <div className="text-xs text-muted-foreground/60 mt-1">{task.area}</div>
                   </button>
                 ))}
               </div>
@@ -187,12 +197,12 @@ export default function Dashboard() {
         {selectedTask ? (
           <>
             {/* Task Header */}
-            <div className="bg-[#1e1e1e] border-b border-[#2a2a2a] p-6">
-              <h2 className="text-2xl font-semibold text-gray-100 mb-3">
+            <div className="bg-sidebar border-b border-border p-6">
+              <h2 className="text-2xl font-semibold text-foreground mb-3">
                 {selectedTask.description}
               </h2>
 
-              <div className="flex items-center gap-4 text-sm text-gray-400">
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 <span>Task: {selectedTask.id}</span>
                 <span>•</span>
                 <span>Area: {selectedTask.area}</span>
@@ -205,12 +215,12 @@ export default function Dashboard() {
 
                 <button
                   onClick={handleCopyTaskId}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded hover:bg-[#2a2a2a] transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded hover:bg-accent transition-colors"
                 >
                   {copiedTaskId ? (
                     <>
-                      <Check className="size-3.5 text-[#22c55e]" />
-                      <span className="text-[#22c55e]">Copied</span>
+                      <Check className="size-3.5 text-chart-2" />
+                      <span className="text-chart-2">Copied</span>
                     </>
                   ) : (
                     <>
@@ -225,22 +235,22 @@ export default function Dashboard() {
             {/* Split View */}
             <div className="flex-1 flex overflow-hidden">
               {/* Details */}
-              <div className="w-1/2 border-r border-[#2a2a2a] flex flex-col">
-                <div className="bg-[#1e1e1e] border-b border-[#2a2a2a] px-4 py-2">
-                  <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
+              <div className="w-1/2 border-r border-border flex flex-col">
+                <div className="bg-sidebar border-b border-border px-4 py-2">
+                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
                     Task Details
                   </h3>
                 </div>
                 <ScrollArea className="flex-1">
                   <div className="p-6 space-y-6">
                     <div>
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Acceptance Criteria</h4>
-                      <p className="text-sm text-gray-300 leading-relaxed">{selectedTask.acceptanceCriteria}</p>
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Acceptance Criteria</h4>
+                      <p className="text-sm text-foreground/80 leading-relaxed">{selectedTask.acceptanceCriteria}</p>
                     </div>
 
                     {selectedTask.dependsOn.length > 0 && (
                       <div>
-                        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Dependencies</h4>
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Dependencies</h4>
                         <div className="space-y-2">
                           {selectedTask.dependsOn.map(depId => {
                             const depTask = snapshot.tasks.find(t => t.id === depId);
@@ -248,10 +258,10 @@ export default function Dashboard() {
                               <button
                                 key={depId}
                                 onClick={() => depTask && setSelectedTask(depTask)}
-                                className="w-full text-left p-3 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] hover:bg-[#252525] transition-colors"
+                                className="w-full text-left p-3 rounded-lg bg-card border border-border hover:bg-accent/50 transition-colors"
                               >
                                 <div className="flex items-center justify-between">
-                                  <span className="text-sm font-mono text-gray-300">{depId}</span>
+                                  <span className="text-sm font-mono text-foreground">{depId}</span>
                                   {depTask && (
                                     <span className={`text-xs px-2 py-0.5 rounded font-semibold ${getStatusColor(depTask.status)}`}>
                                       {depTask.status}
@@ -267,16 +277,16 @@ export default function Dashboard() {
 
                     {getDependentTasks(selectedTask.id).length > 0 && (
                       <div>
-                        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Blocks These Tasks</h4>
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Blocks These Tasks</h4>
                         <div className="space-y-2">
                           {getDependentTasks(selectedTask.id).map(task => (
                             <button
                               key={task.id}
                               onClick={() => setSelectedTask(task)}
-                              className="w-full text-left p-3 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] hover:bg-[#252525] transition-colors"
+                              className="w-full text-left p-3 rounded-lg bg-card border border-border hover:bg-accent/50 transition-colors"
                             >
                               <div className="flex items-center justify-between">
-                                <span className="text-sm font-mono text-gray-300">{task.id}</span>
+                                <span className="text-sm font-mono text-foreground">{task.id}</span>
                                 <span className={`text-xs px-2 py-0.5 rounded font-semibold ${getStatusColor(task.status)}`}>
                                   {task.status}
                                 </span>
@@ -289,26 +299,26 @@ export default function Dashboard() {
 
                     {selectedTask.lastEvent && (
                       <div>
-                        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Last Event</h4>
-                        <div className="bg-[#1a1a1a] rounded-lg p-4 space-y-2 text-sm">
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Last Event</h4>
+                        <div className="bg-card rounded-lg p-4 space-y-2 text-sm border border-border">
                           <div className="flex justify-between">
-                            <span className="text-gray-500">Agent:</span>
-                            <span className="text-gray-300 font-mono">{selectedTask.lastEvent.agent}</span>
+                            <span className="text-muted-foreground">Agent:</span>
+                            <span className="text-foreground font-mono">{selectedTask.lastEvent.agent}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-500">Time:</span>
-                            <span className="text-gray-300">{new Date(selectedTask.lastEvent.timestamp).toLocaleString()}</span>
+                            <span className="text-muted-foreground">Time:</span>
+                            <span className="text-foreground">{new Date(selectedTask.lastEvent.timestamp).toLocaleString()}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-500">Status:</span>
+                            <span className="text-muted-foreground">Status:</span>
                             <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getStatusColor(selectedTask.lastEvent.status)}`}>
                               {selectedTask.lastEvent.status}
                             </span>
                           </div>
                           {selectedTask.lastEvent.meta && (
-                            <div className="mt-3 pt-3 border-t border-[#2a2a2a]">
-                              <span className="text-gray-500 text-xs block mb-2">Metadata:</span>
-                              <pre className="text-xs text-gray-400 bg-[#141414] p-2 rounded overflow-auto">
+                            <div className="mt-3 pt-3 border-t border-border">
+                              <span className="text-muted-foreground text-xs block mb-2">Metadata:</span>
+                              <pre className="text-xs text-muted-foreground bg-background p-2 rounded overflow-auto">
                                 {JSON.stringify(selectedTask.lastEvent.meta, null, 2)}
                               </pre>
                             </div>
@@ -322,8 +332,8 @@ export default function Dashboard() {
 
               {/* Statistics */}
               <div className="w-1/2 flex flex-col">
-                <div className="bg-[#1e1e1e] border-b border-[#2a2a2a] px-4 py-2">
-                  <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
+                <div className="bg-sidebar border-b border-border px-4 py-2">
+                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
                     Overview
                   </h3>
                 </div>
@@ -331,55 +341,55 @@ export default function Dashboard() {
                   <div className="p-6 space-y-6">
                     {/* Summary Cards */}
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-4">
-                        <div className="text-2xl font-bold text-gray-100">{snapshot.summary.total}</div>
-                        <div className="text-xs text-gray-500 mt-1">Total Tasks</div>
+                      <div className="bg-card border border-border rounded-lg p-4">
+                        <div className="text-2xl font-bold text-foreground">{snapshot.summary.total}</div>
+                        <div className="text-xs text-muted-foreground mt-1">Total Tasks</div>
                       </div>
-                      <div className="bg-[#1a1a1a] border border-[#22c55e]/30 rounded-lg p-4">
-                        <div className="text-2xl font-bold text-[#22c55e]">{snapshot.summary.done}</div>
-                        <div className="text-xs text-gray-500 mt-1">Done</div>
+                      <div className="bg-card border border-chart-2/30 rounded-lg p-4">
+                        <div className="text-2xl font-bold text-chart-2">{snapshot.summary.done}</div>
+                        <div className="text-xs text-muted-foreground mt-1">Done</div>
                       </div>
-                      <div className="bg-[#1a1a1a] border border-[#ef4444]/30 rounded-lg p-4">
-                        <div className="text-2xl font-bold text-[#ef4444]">{snapshot.summary.failed}</div>
-                        <div className="text-xs text-gray-500 mt-1">Failed</div>
+                      <div className="bg-card border border-chart-5/30 rounded-lg p-4">
+                        <div className="text-2xl font-bold text-chart-5">{snapshot.summary.failed}</div>
+                        <div className="text-xs text-muted-foreground mt-1">Failed</div>
                       </div>
-                      <div className="bg-[#1a1a1a] border border-[#f59e0b]/30 rounded-lg p-4">
-                        <div className="text-2xl font-bold text-[#f59e0b]">{snapshot.summary.blocked}</div>
-                        <div className="text-xs text-gray-500 mt-1">Blocked</div>
+                      <div className="bg-card border border-chart-3/30 rounded-lg p-4">
+                        <div className="text-2xl font-bold text-chart-3">{snapshot.summary.blocked}</div>
+                        <div className="text-xs text-muted-foreground mt-1">Blocked</div>
                       </div>
-                      <div className="bg-[#1a1a1a] border border-[#3b82f6]/30 rounded-lg p-4">
-                        <div className="text-2xl font-bold text-[#3b82f6]">{snapshot.summary.ready}</div>
-                        <div className="text-xs text-gray-500 mt-1">Ready</div>
+                      <div className="bg-card border border-chart-1/30 rounded-lg p-4">
+                        <div className="text-2xl font-bold text-chart-1">{snapshot.summary.ready}</div>
+                        <div className="text-xs text-muted-foreground mt-1">Ready</div>
                       </div>
-                      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-4">
-                        <div className="text-2xl font-bold text-gray-100">{Math.round(snapshot.summary.successRate * 100)}%</div>
-                        <div className="text-xs text-gray-500 mt-1">Success Rate</div>
+                      <div className="bg-card border border-border rounded-lg p-4">
+                        <div className="text-2xl font-bold text-foreground">{Math.round(snapshot.summary.successRate * 100)}%</div>
+                        <div className="text-xs text-muted-foreground mt-1">Success Rate</div>
                       </div>
                     </div>
 
                     {/* Slice Progress */}
                     <div>
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3">Slice Progress</h4>
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3">Slice Progress</h4>
                       <div className="space-y-3">
                         {Object.entries(snapshot.slices).map(([sliceId, slice]) => (
-                          <div key={sliceId} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-4">
+                          <div key={sliceId} className="bg-card border border-border rounded-lg p-4">
                             <div className="flex justify-between mb-2">
-                              <span className="font-semibold text-gray-300">{sliceId}</span>
-                              <span className="text-gray-400 text-sm">
+                              <span className="font-semibold text-foreground">{sliceId}</span>
+                              <span className="text-muted-foreground text-sm">
                                 {slice.done}/{slice.total} ({slice.progress}%)
                               </span>
                             </div>
-                            <div className="w-full bg-[#2a2a2a] rounded-full h-2">
+                            <div className="w-full bg-muted rounded-full h-2">
                               <div
-                                className="bg-[#22c55e] h-2 rounded-full transition-all"
+                                className="bg-chart-2 h-2 rounded-full transition-all"
                                 style={{ width: `${slice.progress}%` }}
                               />
                             </div>
                             <div className="flex gap-4 mt-3 text-xs">
-                              <span className="text-[#22c55e]">Done: {slice.done}</span>
-                              <span className="text-[#ef4444]">Failed: {slice.failed}</span>
-                              <span className="text-[#f59e0b]">Blocked: {slice.blocked}</span>
-                              <span className="text-[#3b82f6]">Ready: {slice.ready}</span>
+                              <span className="text-chart-2">Done: {slice.done}</span>
+                              <span className="text-chart-5">Failed: {slice.failed}</span>
+                              <span className="text-chart-3">Blocked: {slice.blocked}</span>
+                              <span className="text-chart-1">Ready: {slice.ready}</span>
                             </div>
                           </div>
                         ))}
@@ -393,8 +403,8 @@ export default function Dashboard() {
         ) : (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <p className="text-gray-500 text-lg mb-2">No task selected</p>
-              <p className="text-gray-600 text-sm">Select a task from the sidebar to view details</p>
+              <p className="text-muted-foreground text-lg mb-2">No task selected</p>
+              <p className="text-muted-foreground/60 text-sm">Select a task from the sidebar to view details</p>
             </div>
           </div>
         )}
