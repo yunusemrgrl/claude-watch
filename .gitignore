@@ -9,3 +9,9 @@ coverage/
 .agent-scope/
 .DS_Store
 .env
+
+# Internal documentation
+brief.md
+
+# Auto-generated files
+dashboard/next-env.d.ts
