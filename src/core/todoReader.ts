@@ -5,27 +5,40 @@ import type { ClaudeTask, ClaudeSession } from './types.js';
 const SKIP_FILES = new Set(['.lock', '.highwatermark']);
 
 /**
- * Reads all sessions from ~/.claude/tasks/ directory.
- * Each subdirectory is a session containing numbered JSON task files.
+ * Reads all sessions from ~/.claude/tasks/ and ~/.claude/todos/ directories.
+ * tasks/: legacy format — subdirectories with individual JSON task files.
+ * todos/: current format — single JSON array file per session.
  */
 export function readSessions(claudeDir: string): ClaudeSession[] {
+  const sessionMap = new Map<string, ClaudeSession>();
+
+  // Read legacy tasks/ directory (subdirectories with individual files)
   const tasksDir = join(claudeDir, 'tasks');
-
-  if (!existsSync(tasksDir)) {
-    return [];
-  }
-
-  const entries = readdirSync(tasksDir, { withFileTypes: true });
-  const sessions: ClaudeSession[] = [];
-
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-
-    const session = readSession(tasksDir, entry.name);
-    if (session && session.tasks.length > 0) {
-      sessions.push(session);
+  if (existsSync(tasksDir)) {
+    const entries = readdirSync(tasksDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const session = readSession(tasksDir, entry.name);
+      if (session && session.tasks.length > 0) {
+        sessionMap.set(session.id, session);
+      }
     }
   }
+
+  // Read current todos/ directory (single array file per session)
+  const todosDir = join(claudeDir, 'todos');
+  if (existsSync(todosDir)) {
+    const files = readdirSync(todosDir).filter(f => f.endsWith('.json'));
+    for (const file of files) {
+      const session = readTodosFile(todosDir, file);
+      if (session && session.tasks.length > 0) {
+        // todos/ format is newer, overwrite if duplicate sessionId
+        sessionMap.set(session.id, session);
+      }
+    }
+  }
+
+  const sessions = Array.from(sessionMap.values());
 
   // Sort by most recent activity (updatedAt desc)
   sessions.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -109,7 +122,73 @@ function readSessionTasks(sessionDir: string): ClaudeTask[] {
 }
 
 /**
- * Validates and normalizes a parsed JSON object into a ClaudeTask.
+ * Reads a todos/ format file: single JSON array with all tasks.
+ * Filename pattern: <sessionId>-agent-<sessionId>.json
+ */
+function readTodosFile(todosDir: string, filename: string): ClaudeSession | null {
+  // Extract sessionId from filename (e.g. "abc123-agent-abc123.json" → "abc123")
+  const match = filename.match(/^([a-f0-9-]+)-agent-/);
+  if (!match) return null;
+
+  const sessionId = match[1];
+  const filePath = join(todosDir, filename);
+
+  try {
+    const content = readFileSync(filePath, 'utf-8');
+    const parsed = JSON.parse(content);
+
+    if (!Array.isArray(parsed)) return null;
+
+    const tasks: ClaudeTask[] = [];
+    for (let i = 0; i < parsed.length; i++) {
+      const task = validateTodoItem(parsed[i], i);
+      if (task) tasks.push(task);
+    }
+
+    if (tasks.length === 0) return null;
+
+    const stat = statSync(filePath);
+    return {
+      id: sessionId,
+      tasks,
+      createdAt: stat.birthtime.toISOString(),
+      updatedAt: stat.mtime.toISOString()
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Validates a todo item from the todos/ format (has content instead of subject, no id).
+ */
+function validateTodoItem(obj: unknown, index: number): ClaudeTask | null {
+  if (!obj || typeof obj !== 'object') return null;
+
+  const record = obj as Record<string, unknown>;
+
+  if (typeof record.status !== 'string') return null;
+
+  const validStatuses = ['pending', 'in_progress', 'completed'];
+  if (!validStatuses.includes(record.status)) return null;
+
+  // todos format uses "content" instead of "subject"
+  const subject = typeof record.content === 'string' ? record.content
+    : typeof record.subject === 'string' ? record.subject : '';
+
+  return {
+    id: typeof record.id === 'string' ? record.id : String(index + 1),
+    subject,
+    description: typeof record.description === 'string' ? record.description : '',
+    activeForm: typeof record.activeForm === 'string' ? record.activeForm : '',
+    status: record.status as ClaudeTask['status'],
+    blocks: Array.isArray(record.blocks) ? record.blocks.filter((b): b is string => typeof b === 'string') : [],
+    blockedBy: Array.isArray(record.blockedBy) ? record.blockedBy.filter((b): b is string => typeof b === 'string') : []
+  };
+}
+
+/**
+ * Validates and normalizes a parsed JSON object into a ClaudeTask (legacy tasks/ format).
  */
 function validateClaudeTask(obj: unknown): ClaudeTask | null {
   if (!obj || typeof obj !== 'object') return null;
