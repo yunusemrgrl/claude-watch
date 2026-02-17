@@ -18,7 +18,7 @@
     "build:dashboard": "cd dashboard && npm run build",
     "test": "vitest --run",
     "test:coverage": "vitest --coverage",
-    "prepublishOnly": "npm run build && npm test"
+    "version": "node scripts/sync-version.mjs && git add dashboard/package.json src/cli.ts"
   },
   "keywords": [
     "agent",
