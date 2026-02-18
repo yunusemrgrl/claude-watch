@@ -276,7 +276,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-4">
           <div className="flex items-baseline gap-2">
             <h1 className="text-lg font-semibold text-foreground">agent-scope</h1>
-            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">v0.2</span>
+            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">v0.4.0</span>
           </div>
 
           {/* Mode Toggle */}
