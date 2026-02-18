@@ -270,14 +270,15 @@ function initCopyButtons() {
   if (termBtn) {
     termBtn.addEventListener('click', () => {
       const code = [
-        '# Start watching default Claude tasks folder',
+        '# Zero-install — run directly with npx',
         'npx agent-scope start',
         '',
-        '# Custom project path',
-        'npx agent-scope start --claude-dir ~/my-project/.claude',
+        '# Or install globally',
+        'npm install -g agent-scope',
+        'agent-scope start',
         '',
-        '# Custom port',
-        'npx agent-scope start --port 3000',
+        '# Custom project path',
+        'agent-scope start --claude-dir ~/my-project/.claude',
       ].join('\n');
 
       copyText(code, termBtn, 'copied! ✓');

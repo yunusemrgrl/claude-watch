@@ -366,14 +366,15 @@
                 <span class="term-title">Terminal</span>
                 <button class="term-copy-btn" id="term-copy">copy</button>
               </div>
-              <pre class="term-body"><code><span class="t-comment"># Start watching default Claude tasks folder</span>
+              <pre class="term-body"><code><span class="t-comment"># Zero-install — run directly with npx</span>
 <span class="t-prompt">$</span> <span class="t-cmd">npx agent-scope start</span>
 
-<span class="t-comment"># Custom project path</span>
-<span class="t-prompt">$</span> <span class="t-cmd">npx agent-scope start</span> <span class="t-flag">--claude-dir</span> <span class="t-arg">~/my-project/.claude</span>
+<span class="t-comment"># Or install globally</span>
+<span class="t-prompt">$</span> <span class="t-pkg">npm</span> <span class="t-cmd">install</span> <span class="t-flag">-g</span> <span class="t-arg">agent-scope</span>
+<span class="t-prompt">$</span> <span class="t-cmd">agent-scope start</span>
 
-<span class="t-comment"># Custom port</span>
-<span class="t-prompt">$</span> <span class="t-cmd">npx agent-scope start</span> <span class="t-flag">--port</span> <span class="t-arg">3000</span>
+<span class="t-comment"># Custom project path</span>
+<span class="t-prompt">$</span> <span class="t-cmd">agent-scope start</span> <span class="t-flag">--claude-dir</span> <span class="t-arg">~/my-project/.claude</span>
 
 <span class="t-out">▶</span> <span class="t-info">Reading ~/.claude/tasks/</span>
 <span class="t-out">▶</span> <span class="t-info">Watching .agent-scope/queue.md</span>

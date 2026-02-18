@@ -900,6 +900,7 @@ code {
 .t-comment { color: #444450; font-style: italic; }
 .t-prompt { color: var(--green); }
 .t-cmd { color: var(--cyan-dim); }
+.t-pkg { color: #cb3837; }
 .t-flag { color: #a78bfa; }
 .t-arg { color: var(--orange); }
 .t-out { color: var(--text-muted); }
