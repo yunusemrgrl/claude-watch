@@ -251,6 +251,21 @@ export async function startServer(options: ServerOptions): Promise<void> {
     return response;
   });
 
+  // Claude Code insights report endpoint
+  fastify.get('/claude-insights', async (_request, reply) => {
+    const reportPath = join(claudeDir, 'usage-data', 'report.html');
+
+    if (!existsSync(reportPath)) {
+      return reply.code(404).send({
+        error: 'Claude insights report not found',
+        hint: 'Run /insight command in Claude Code to generate the report'
+      });
+    }
+
+    reply.type('text/html');
+    return reply.sendFile('usage-data/report.html', join(claudeDir));
+  });
+
   // Serve static files and SPA
   const publicPath = join(__dirname, '../public');
   if (existsSync(publicPath)) {

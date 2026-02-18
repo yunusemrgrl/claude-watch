@@ -1257,6 +1257,34 @@ function InsightsView({ data }: { data: InsightsResponse | null }) {
           </p>
         </div>
 
+        {/* Claude Code Insights Report */}
+        <div className="bg-card border border-border rounded-lg overflow-hidden">
+          <div className="p-4 border-b border-border bg-muted/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Brain className="size-5 text-primary" />
+                <h2 className="text-lg font-semibold">Claude Code Insights</h2>
+              </div>
+              <a
+                href="/claude-insights"
+                target="_blank"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Open in new tab →
+              </a>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Detailed usage report from Claude Code /insight command
+            </p>
+          </div>
+          <iframe
+            src="/claude-insights"
+            className="w-full h-[800px] border-0"
+            sandbox="allow-scripts allow-same-origin"
+            title="Claude Code Insights Report"
+          />
+        </div>
+
         {/* Plan Mode Insights */}
         {plan && (
           <div className="space-y-6">
