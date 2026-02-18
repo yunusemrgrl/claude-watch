@@ -73,3 +73,74 @@ export interface Snapshot {
     successRate: number;  // done / (done + failed)
   };
 }
+
+// Insights types
+export interface TimelineDataPoint {
+  timestamp: string;
+  completed: number;
+  failed: number;
+  total: number;
+}
+
+export interface PlanInsights {
+  summary: {
+    totalTasks: number;
+    completedTasks: number;
+    failedTasks: number;
+    blockedTasks: number;
+    successRate: number;
+    completionRate: number;
+  };
+  timeline: TimelineDataPoint[];
+  sliceStats: Record<string, {
+    name: string;
+    total: number;
+    completed: number;
+    failed: number;
+    blocked: number;
+    progress: number;
+  }>;
+  velocity: {
+    tasksPerHour: number;
+    tasksPerDay: number;
+    avgTaskDuration: number; // in minutes
+  };
+  bottlenecks: Array<{
+    taskId: string;
+    blocksCount: number; // how many tasks it blocks
+    description: string;
+  }>;
+}
+
+export interface LiveInsights {
+  summary: {
+    totalSessions: number;
+    activeSessions: number;
+    totalTasks: number;
+    completedTasks: number;
+    inProgressTasks: number;
+    pendingTasks: number;
+  };
+  timeline: TimelineDataPoint[];
+  tokenUsage: {
+    total: number;
+    input: number;
+    output: number;
+    cacheCreation: number;
+    cacheRead: number;
+  };
+  topSessions: Array<{
+    id: string;
+    taskCount: number;
+    completedCount: number;
+    projectName?: string;
+    lastActivity: string;
+  }>;
+}
+
+export interface InsightsResponse {
+  mode: 'live' | 'plan' | 'both';
+  live?: LiveInsights;
+  plan?: PlanInsights;
+  generatedAt: string;
+}

@@ -20,6 +20,9 @@ import {
   ClipboardList,
   PanelLeft,
   PanelLeftClose,
+  BarChart3,
+  TrendingUp,
+  Activity,
 } from "lucide-react";
 import type {
   SnapshotResponse,
@@ -29,10 +32,11 @@ import type {
   SessionsResponse,
   HealthResponse,
   TokenUsage,
+  InsightsResponse,
 } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-type ViewMode = "live" | "plan";
+type ViewMode = "live" | "plan" | "insights";
 
 function TypingPrompt({ lines }: { lines: string[] }) {
   const [lineIndex, setLineIndex] = useState(0);
@@ -88,6 +92,9 @@ export default function Dashboard() {
   const [planData, setPlanData] = useState<SnapshotResponse | null>(null);
   const [selectedTask, setSelectedTask] = useState<ComputedTask | null>(null);
   const [expandedSlices, setExpandedSlices] = useState<Set<string>>(new Set());
+
+  // Insights mode state
+  const [insightsData, setInsightsData] = useState<InsightsResponse | null>(null);
 
   // Shared state
   const [loading, setLoading] = useState(true);
@@ -164,19 +171,34 @@ export default function Dashboard() {
     }
   }, []);
 
+  // Fetch insights (Insights mode)
+  const fetchInsights = useCallback(async () => {
+    try {
+      const response = await fetch("/insights");
+      if (!response.ok) throw new Error("Failed to fetch insights");
+      const result: InsightsResponse = await response.json();
+      setInsightsData(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    }
+  }, []);
+
   // Initial data load based on mode
   useEffect(() => {
     if (loading) return;
     if (mode === "live" && availableModes.live) fetchSessions();
     if (mode === "plan" && availableModes.plan) fetchSnapshot();
-  }, [mode, loading, availableModes]);
+    if (mode === "insights") fetchInsights();
+  }, [mode, loading, availableModes, fetchSessions, fetchSnapshot, fetchInsights]);
 
   // Refs for latest fetch functions and mode — SSE handler uses these to avoid stale closures
   const fetchSessionsRef = useRef(fetchSessions);
   const fetchSnapshotRef = useRef(fetchSnapshot);
+  const fetchInsightsRef = useRef(fetchInsights);
   const modeRef = useRef(mode);
   useEffect(() => { fetchSessionsRef.current = fetchSessions; }, [fetchSessions]);
   useEffect(() => { fetchSnapshotRef.current = fetchSnapshot; }, [fetchSnapshot]);
+  useEffect(() => { fetchInsightsRef.current = fetchInsights; }, [fetchInsights]);
   useEffect(() => { modeRef.current = mode; }, [mode]);
 
   // SSE connection — opens once on mount, never reconnects due to state changes
@@ -191,6 +213,9 @@ export default function Dashboard() {
         const data = JSON.parse(event.data);
         if (data.type === "sessions" && modeRef.current === "live") fetchSessionsRef.current();
         if (data.type === "plan" && modeRef.current === "plan") fetchSnapshotRef.current();
+        if (data.type === "sessions" || data.type === "plan") {
+          if (modeRef.current === "insights") fetchInsightsRef.current();
+        }
       } catch { /* ignore parse errors */ }
     };
 
@@ -323,6 +348,19 @@ export default function Dashboard() {
                 Plan
               </button>
             )}
+            {(availableModes.live || availableModes.plan) && (
+              <button
+                onClick={() => setMode("insights")}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors ${
+                  mode === "insights"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <BarChart3 className="size-3" />
+                Insights
+              </button>
+            )}
           </div>
         </div>
 
@@ -364,7 +402,7 @@ export default function Dashboard() {
             sidebarCollapsed={sidebarCollapsed}
             mounted={mounted}
           />
-        ) : (
+        ) : mode === "plan" ? (
           <PlanView
             data={planData}
             selectedTask={selectedTask}
@@ -378,6 +416,8 @@ export default function Dashboard() {
             sidebarCollapsed={sidebarCollapsed}
             mounted={mounted}
           />
+        ) : (
+          <InsightsView data={insightsData} />
         )}
       </div>
     </div>
@@ -1187,5 +1227,262 @@ function PlanView({
         )}
       </div>
     </>
+  );
+}
+
+// Insights View Component
+function InsightsView({ data }: { data: InsightsResponse | null }) {
+  if (!data) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <BarChart3 className="size-16 mx-auto mb-4 text-muted-foreground" />
+          <h2 className="text-xl font-semibold mb-2">Loading Insights...</h2>
+          <p className="text-muted-foreground">Analyzing your workflow data</p>
+        </div>
+      </div>
+    );
+  }
+
+  const { live, plan, mode: dataMode } = data;
+
+  return (
+    <div className="flex-1 overflow-auto">
+      <div className="max-w-7xl mx-auto p-8 space-y-8">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Analytics & Insights</h1>
+          <p className="text-muted-foreground">
+            Generated at {new Date(data.generatedAt).toLocaleString()}
+          </p>
+        </div>
+
+        {/* Plan Mode Insights */}
+        {plan && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-2">
+              <ClipboardList className="size-5" />
+              <h2 className="text-2xl font-semibold">Plan Mode Analytics</h2>
+            </div>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-card border border-border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">Total Tasks</span>
+                  <FileText className="size-4 text-muted-foreground" />
+                </div>
+                <div className="text-2xl font-bold">{plan.summary.totalTasks}</div>
+              </div>
+
+              <div className="bg-card border border-border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">Completed</span>
+                  <Check className="size-4 text-chart-2" />
+                </div>
+                <div className="text-2xl font-bold text-chart-2">
+                  {plan.summary.completedTasks}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {(plan.summary.completionRate * 100).toFixed(1)}% complete
+                </div>
+              </div>
+
+              <div className="bg-card border border-border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">Success Rate</span>
+                  <TrendingUp className="size-4 text-chart-1" />
+                </div>
+                <div className="text-2xl font-bold">
+                  {(plan.summary.successRate * 100).toFixed(1)}%
+                </div>
+              </div>
+
+              <div className="bg-card border border-border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">Velocity</span>
+                  <Activity className="size-4 text-muted-foreground" />
+                </div>
+                <div className="text-2xl font-bold">
+                  {plan.velocity.tasksPerDay.toFixed(1)}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">tasks/day</div>
+              </div>
+            </div>
+
+            {/* Slice Statistics */}
+            {Object.keys(plan.sliceStats).length > 0 && (
+              <div className="bg-card border border-border rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">Progress by Slice</h3>
+                <div className="space-y-4">
+                  {Object.values(plan.sliceStats)
+                    .sort((a, b) => b.progress - a.progress)
+                    .map((slice) => (
+                      <div key={slice.name}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium">{slice.name}</span>
+                          <span className="text-sm text-muted-foreground">
+                            {slice.completed}/{slice.total} ({slice.progress.toFixed(0)}%)
+                          </span>
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-2">
+                          <div
+                            className="bg-chart-2 h-2 rounded-full transition-all"
+                            style={{ width: `${slice.progress}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Bottlenecks */}
+            {plan.bottlenecks.length > 0 && (
+              <div className="bg-card border border-border rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">Bottlenecks</h3>
+                <div className="space-y-3">
+                  {plan.bottlenecks.map((bottleneck) => (
+                    <div
+                      key={bottleneck.taskId}
+                      className="flex items-start gap-3 p-3 bg-muted rounded-lg"
+                    >
+                      <AlertCircle className="size-5 text-destructive mt-0.5" />
+                      <div className="flex-1">
+                        <div className="font-medium">{bottleneck.taskId}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {bottleneck.description}
+                        </div>
+                        <div className="text-xs text-destructive mt-1">
+                          Blocks {bottleneck.blocksCount} task
+                          {bottleneck.blocksCount !== 1 ? "s" : ""}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Live Mode Insights */}
+        {live && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-2">
+              <Radio className="size-5" />
+              <h2 className="text-2xl font-semibold">Live Mode Analytics</h2>
+            </div>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-card border border-border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">Sessions</span>
+                  <Bot className="size-4 text-muted-foreground" />
+                </div>
+                <div className="text-2xl font-bold">{live.summary.totalSessions}</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {live.summary.activeSessions} active
+                </div>
+              </div>
+
+              <div className="bg-card border border-border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">Total Tasks</span>
+                  <FileText className="size-4 text-muted-foreground" />
+                </div>
+                <div className="text-2xl font-bold">{live.summary.totalTasks}</div>
+              </div>
+
+              <div className="bg-card border border-border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">Completed</span>
+                  <Check className="size-4 text-chart-2" />
+                </div>
+                <div className="text-2xl font-bold text-chart-2">
+                  {live.summary.completedTasks}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {live.summary.inProgressTasks} in progress
+                </div>
+              </div>
+
+              <div className="bg-card border border-border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">Token Usage</span>
+                  <Brain className="size-4 text-muted-foreground" />
+                </div>
+                <div className="text-2xl font-bold">
+                  {(live.tokenUsage.total / 1000).toFixed(1)}K
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">total tokens</div>
+              </div>
+            </div>
+
+            {/* Token Usage Breakdown */}
+            <div className="bg-card border border-border rounded-lg p-6">
+              <h3 className="text-lg font-semibold mb-4">Token Distribution</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <div className="text-sm text-muted-foreground">Input</div>
+                  <div className="text-xl font-semibold">
+                    {(live.tokenUsage.input / 1000).toFixed(1)}K
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground">Output</div>
+                  <div className="text-xl font-semibold">
+                    {(live.tokenUsage.output / 1000).toFixed(1)}K
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground">Cache Creation</div>
+                  <div className="text-xl font-semibold">
+                    {(live.tokenUsage.cacheCreation / 1000).toFixed(1)}K
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground">Cache Read</div>
+                  <div className="text-xl font-semibold">
+                    {(live.tokenUsage.cacheRead / 1000).toFixed(1)}K
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Top Sessions */}
+            {live.topSessions.length > 0 && (
+              <div className="bg-card border border-border rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">Most Active Sessions</h3>
+                <div className="space-y-3">
+                  {live.topSessions.map((session, index) => (
+                    <div
+                      key={session.id}
+                      className="flex items-center gap-3 p-3 bg-muted rounded-lg"
+                    >
+                      <div className="size-8 rounded-full bg-chart-1 text-chart-1-foreground flex items-center justify-center font-semibold">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium">
+                          {session.projectName || session.id.slice(0, 12)}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {session.taskCount} tasks ({session.completedCount} completed)
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(session.lastActivity).toLocaleDateString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

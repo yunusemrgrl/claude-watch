@@ -7,9 +7,10 @@ import { fileURLToPath } from 'url';
 import { parseQueue, type QueueParseConfig } from '../core/queueParser.js';
 import { parseLog } from '../core/logParser.js';
 import { computeSnapshot } from '../core/stateEngine.js';
+import { computePlanInsights, computeLiveInsights } from '../core/insightsEngine.js';
 import { readSessions } from '../core/todoReader.js';
 import { createWatcher, type WatchEvent } from './watcher.js';
-import type { Snapshot } from '../core/types.js';
+import type { Snapshot, InsightsResponse } from '../core/types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -186,6 +187,68 @@ export async function startServer(options: ServerOptions): Promise<void> {
       logErrors: logResult.errors,
       meta: { generatedAt: new Date().toISOString(), totalTasks: queueResult.tasks.length }
     };
+  });
+
+  // Insights endpoint - analytics for both Live and Plan modes
+  fastify.get('/insights', async () => {
+    const hasLive = existsSync(join(claudeDir, 'tasks')) || existsSync(join(claudeDir, 'todos'));
+    const hasPlan = agentScopeDir ? existsSync(join(agentScopeDir, 'queue.md')) : false;
+
+    const response: InsightsResponse = {
+      mode: hasLive && hasPlan ? 'both' : hasLive ? 'live' : 'plan',
+      generatedAt: new Date().toISOString(),
+    };
+
+    // Compute Live insights
+    if (hasLive) {
+      const sessions = readSessions(claudeDir);
+      response.live = computeLiveInsights(sessions);
+    }
+
+    // Compute Plan insights
+    if (hasPlan && agentScopeDir) {
+      const queuePath = join(agentScopeDir, 'queue.md');
+      const logPath = join(agentScopeDir, 'execution.log');
+
+      if (existsSync(queuePath)) {
+        // Read config for queue parse patterns
+        const configPath = join(agentScopeDir, 'config.json');
+        let queueParseConfig: QueueParseConfig | undefined;
+        if (existsSync(configPath)) {
+          try {
+            const configData = JSON.parse(readFileSync(configPath, 'utf-8'));
+            if (configData.taskModel) {
+              queueParseConfig = {
+                id: configData.taskModel.id,
+                headings: configData.taskModel.headings,
+                fields: configData.taskModel.fields
+              };
+            }
+          } catch { /* use defaults */ }
+        }
+
+        // Parse queue
+        const queueContent = readFileSync(queuePath, 'utf-8');
+        const queueResult = parseQueue(queueContent, queueParseConfig);
+
+        if (queueResult.errors.length === 0) {
+          // Parse log
+          let logResult = parseLog('');
+          if (existsSync(logPath)) {
+            const logContent = readFileSync(logPath, 'utf-8');
+            logResult = parseLog(logContent);
+          }
+
+          // Compute snapshot first, then insights
+          try {
+            const snapshot = computeSnapshot(queueResult.tasks, logResult.events);
+            response.plan = computePlanInsights(snapshot.tasks, logResult.events);
+          } catch { /* skip plan insights on error */ }
+        }
+      }
+    }
+
+    return response;
   });
 
   // Serve static files and SPA
