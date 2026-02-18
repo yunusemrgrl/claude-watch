@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AgentScope — Diagnose Agent Runs With Confidence</title>
+    <meta
+      name="description"
+      content="AgentScope is a deterministic, local, passive execution observer for AI agent workflows. Diagnose, replay, and trust every run without changing your agents."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Fraunces:opsz,wght@9..144,600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-glow" aria-hidden="true"></div>
+    <div class="page-noise" aria-hidden="true"></div>
+
+    <header class="site-header" data-animate>
+      <div class="container nav">
+        <a class="logo" href="#top">
+          <span class="logo-mark">A</span>
+          AgentScope
+        </a>
+        <nav class="nav-links">
+          <a href="#product">Product</a>
+          <a href="#workflow">Workflow</a>
+          <a href="#demo">Live Demo</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#faq">FAQ</a>
+        </nav>
+        <div class="nav-actions">
+          <a class="btn ghost" href="#demo">View demo</a>
+          <a class="btn primary" href="#get-started">Get started</a>
+        </div>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero" id="product">
+        <div class="container hero-grid">
+          <div class="hero-copy" data-animate>
+            <span class="pill">New: deterministic run replay</span>
+            <h1>Diagnose every agent run like a specialist visit.</h1>
+            <p class="lead">
+              AgentScope is a local, passive execution observer for AI agent workflows. Track
+              sessions, events, and quality gates in a timeline you can trust — without changing
+              your agents.
+            </p>
+            <div class="cta-row">
+              <a class="btn primary" href="#get-started">Start observing</a>
+              <a class="btn ghost" href="#demo">Watch the demo</a>
+            </div>
+            <div class="hero-stats">
+              <div>
+                <span>0</span>
+                <small>agent changes</small>
+              </div>
+              <div>
+                <span>24/7</span>
+                <small>timeline capture</small>
+              </div>
+              <div>
+                <span>5m</span>
+                <small>setup time</small>
+              </div>
+            </div>
+            <div class="hero-tags">
+              <span>Passive observer</span>
+              <span>Deterministic logs</span>
+              <span>Local-first</span>
+            </div>
+          </div>
+          <div class="hero-media" data-animate>
+            <div class="media-card">
+              <img src="assets/screenshot-1.png" alt="AgentScope dashboard preview" />
+              <div class="media-badge">
+                <span class="badge-dot"></span>
+                Live session timeline
+              </div>
+            </div>
+            <div class="floating-card">
+              <div class="floating-header">
+                <span class="pulse"></span>
+                Diagnostics ready
+              </div>
+              <p>Quality gates flagged 3 anomalies in the last run.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="trust" data-animate>
+        <div class="container">
+          <p>Designed for teams shipping agentic workflows daily.</p>
+          <div class="logo-row">
+            <span>Autonomous Ops</span>
+            <span>Studio Labs</span>
+            <span>Atlas AI</span>
+            <span>Runbook Cloud</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="diagnostics">
+        <div class="container diagnostics-grid">
+          <div class="diagnostics-copy" data-animate>
+            <span class="section-kicker">Agent health report</span>
+            <h2>Turn noisy runs into clear diagnoses.</h2>
+            <p>
+              Capture every event, prompt, and tool call into a structured timeline. Filter by
+              session, drill into anomalies, and export evidence for your team.
+            </p>
+            <ul class="feature-list">
+              <li>Immutable run ledger with deterministic ordering.</li>
+              <li>Quality gates highlighting drift, retries, and regressions.</li>
+              <li>Local-first storage with fast query APIs.</li>
+            </ul>
+          </div>
+          <div class="diagnostics-cards" data-animate>
+            <article class="card">
+              <h3>Vitals</h3>
+              <p>Track latency, retries, and token budgets across every step.</p>
+            </article>
+            <article class="card">
+              <h3>Prescription</h3>
+              <p>Generate action items from run diffs and annotated evidence.</p>
+            </article>
+            <article class="card">
+              <h3>Timeline</h3>
+              <p>Replay sessions exactly as they happened with total ordering.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="workflow" id="workflow">
+        <div class="container">
+          <div class="section-heading" data-animate>
+            <span class="section-kicker">Workflow</span>
+            <h2>From signal capture to trusted outcomes.</h2>
+          </div>
+          <div class="steps" data-animate>
+            <div class="step">
+              <span class="step-index">01</span>
+              <h3>Observe</h3>
+              <p>Run the CLI beside your agents. No SDKs, no refactors.</p>
+            </div>
+            <div class="step">
+              <span class="step-index">02</span>
+              <h3>Diagnose</h3>
+              <p>Inspect every tool call, prompt, and output in context.</p>
+            </div>
+            <div class="step">
+              <span class="step-index">03</span>
+              <h3>Recover</h3>
+              <p>Replay sessions, compare deltas, and patch regressions fast.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="demo" id="demo">
+        <div class="container demo-grid">
+          <div class="demo-copy" data-animate>
+            <span class="section-kicker">Live demo</span>
+            <h2>See the timeline in motion.</h2>
+            <p>
+              This is a real session capture from AgentScope. Watch how events, tasks, and quality
+              checks align in a single narrative view.
+            </p>
+            <div class="demo-actions">
+              <a class="btn primary" href="#get-started">Launch locally</a>
+              <a class="btn ghost" href="#pricing">Compare plans</a>
+            </div>
+          </div>
+          <div class="demo-media" data-animate>
+            <img src="assets/screenrecord.gif" alt="AgentScope live session recording" />
+          </div>
+        </div>
+      </section>
+
+      <section class="showcase">
+        <div class="container showcase-grid">
+          <div class="showcase-media" data-animate>
+            <img src="assets/screenshot-2.png" alt="AgentScope insights panel" />
+          </div>
+          <div class="showcase-copy" data-animate>
+            <span class="section-kicker">Insights</span>
+            <h2>Quality gates with evidence, not guesses.</h2>
+            <p>
+              Track regressions and policy violations with a timeline-backed report. Each alert
+              links directly to the evidence that triggered it.
+            </p>
+            <div class="pill-row">
+              <span>Replay diffs</span>
+              <span>Trace exports</span>
+              <span>Session health</span>
+              <span>Worktree snapshots</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="pricing" id="pricing">
+        <div class="container">
+          <div class="section-heading" data-animate>
+            <span class="section-kicker">Pricing</span>
+            <h2>Built for teams shipping today.</h2>
+          </div>
+          <div class="pricing-grid" data-animate>
+            <article class="price-card">
+              <h3>Starter</h3>
+              <p class="price">Free</p>
+              <ul>
+                <li>Local observer + timeline</li>
+                <li>1 workspace</li>
+                <li>Manual exports</li>
+              </ul>
+              <a class="btn ghost" href="#get-started">Use locally</a>
+            </article>
+            <article class="price-card highlight">
+              <div class="plan-tag">Most popular</div>
+              <h3>Team</h3>
+              <p class="price">$29<span>/seat</span></p>
+              <ul>
+                <li>Shared sessions + review</li>
+                <li>Quality gate automation</li>
+                <li>Priority diagnostics</li>
+              </ul>
+              <a class="btn primary" href="#get-started">Start trial</a>
+            </article>
+            <article class="price-card">
+              <h3>Enterprise</h3>
+              <p class="price">Custom</p>
+              <ul>
+                <li>On-prem + SSO</li>
+                <li>Compliance evidence bundles</li>
+                <li>Dedicated support</li>
+              </ul>
+              <a class="btn ghost" href="#get-started">Contact sales</a>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="faq" id="faq">
+        <div class="container">
+          <div class="section-heading" data-animate>
+            <span class="section-kicker">FAQ</span>
+            <h2>Clear answers for busy builders.</h2>
+          </div>
+          <div class="faq-grid" data-animate>
+            <article>
+              <h3>Does this modify my agents?</h3>
+              <p>No. AgentScope observes from the outside with passive hooks.</p>
+            </article>
+            <article>
+              <h3>Where is data stored?</h3>
+              <p>Local-first by default. Choose where to persist run history.</p>
+            </article>
+            <article>
+              <h3>Can I replay sessions?</h3>
+              <p>Yes — the timeline records deterministic ordering for replay.</p>
+            </article>
+            <article>
+              <h3>Is there a hosted option?</h3>
+              <p>Team and Enterprise plans can sync to hosted dashboards.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="cta" id="get-started">
+        <div class="container cta-card" data-animate>
+          <div>
+            <h2>Ready to give your agents a checkup?</h2>
+            <p>Spin up AgentScope locally in minutes and watch your workflows unfold.</p>
+          </div>
+          <div class="cta-actions">
+            <a class="btn primary" href="#top">Get the CLI</a>
+            <a class="btn ghost" href="#demo">Book a demo</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-grid">
+        <div>
+          <div class="logo">AgentScope</div>
+          <p>Deterministic, local, passive execution observer for AI agent workflows.</p>
+        </div>
+        <div>
+          <h4>Product</h4>
+          <a href="#product">Overview</a>
+          <a href="#workflow">Workflow</a>
+          <a href="#demo">Live demo</a>
+        </div>
+        <div>
+          <h4>Resources</h4>
+          <a href="#faq">FAQ</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#get-started">Get started</a>
+        </div>
+        <div>
+          <h4>Contact</h4>
+          <a href="mailto:hello@agentscope.dev">hello@agentscope.dev</a>
+          <span>Remote-first • Istanbul</span>
+        </div>
+      </div>
+      <div class="container footer-meta">© 2026 AgentScope. Built for reliable agents.</div>
+    </footer>
+
+    <script src="main.js"></script>
+  </body>
+</html>
