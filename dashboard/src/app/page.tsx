@@ -95,7 +95,13 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedTaskId, setCopiedTaskId] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
+
+  // Mark component as mounted to enable transitions
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Detect available modes
   useEffect(() => {
@@ -356,6 +362,7 @@ export default function Dashboard() {
             handleCopyTaskId={handleCopyTaskId}
             copiedTaskId={copiedTaskId}
             sidebarCollapsed={sidebarCollapsed}
+            mounted={mounted}
           />
         ) : (
           <PlanView
@@ -369,6 +376,7 @@ export default function Dashboard() {
             handleCopyTaskId={handleCopyTaskId}
             copiedTaskId={copiedTaskId}
             sidebarCollapsed={sidebarCollapsed}
+            mounted={mounted}
           />
         )}
       </div>
@@ -391,6 +399,7 @@ function LiveView({
   handleCopyTaskId,
   copiedTaskId,
   sidebarCollapsed,
+  mounted,
 }: {
   sessions: ClaudeSession[];
   selectedSession: ClaudeSession | null;
@@ -404,6 +413,7 @@ function LiveView({
   handleCopyTaskId: (id: string) => void;
   copiedTaskId: boolean;
   sidebarCollapsed: boolean;
+  mounted: boolean;
 }) {
   if (sessions.length === 0) {
     return (
@@ -464,9 +474,9 @@ function LiveView({
   return (
     <>
       {/* Session Sidebar */}
-      <div className={`bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300 overflow-hidden ${
-        sidebarCollapsed ? "w-0 border-r-0" : "w-[220px]"
-      }`}>
+      <div className={`bg-sidebar border-r border-sidebar-border flex flex-col overflow-hidden ${
+        mounted ? "transition-all duration-300" : ""
+      } ${sidebarCollapsed ? "w-0 border-r-0" : "w-[220px]"}`}>
         <div className="p-3 border-b border-sidebar-border">
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
             Sessions
@@ -764,6 +774,7 @@ function PlanView({
   handleCopyTaskId,
   copiedTaskId,
   sidebarCollapsed,
+  mounted,
 }: {
   data: SnapshotResponse | null;
   selectedTask: ComputedTask | null;
@@ -775,6 +786,7 @@ function PlanView({
   handleCopyTaskId: (id: string) => void;
   copiedTaskId: boolean;
   sidebarCollapsed: boolean;
+  mounted: boolean;
 }) {
   if (!data || !data.snapshot) {
     return (
@@ -838,9 +850,9 @@ function PlanView({
   return (
     <>
       {/* Left Sidebar */}
-      <div className={`bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300 overflow-hidden ${
-        sidebarCollapsed ? "w-0 min-w-0 border-r-0" : "w-[25%] min-w-[280px]"
-      }`}>
+      <div className={`bg-sidebar border-r border-sidebar-border flex flex-col overflow-hidden ${
+        mounted ? "transition-all duration-300" : ""
+      } ${sidebarCollapsed ? "w-0 min-w-0 border-r-0" : "w-[25%] min-w-[280px]"}`}>
         <ScrollArea className="flex-1">
           <div className="p-3 space-y-3">
             {Object.entries(tasksBySlice).map(([sliceId, tasks]) => (
