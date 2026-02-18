@@ -1492,6 +1492,36 @@ function PlanView({
 // Insights View Component
 function InsightsView({ data }: { data: InsightsResponse | null }) {
   const [reportError, setReportError] = useState(false);
+  const [checking, setChecking] = useState(true);
+
+  // Check if report exists before rendering iframe
+  useEffect(() => {
+    fetch("/claude-insights")
+      .then((res) => {
+        if (!res.ok) {
+          setReportError(true);
+        } else {
+          // Check if response is HTML or JSON
+          const contentType = res.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            setReportError(true);
+          }
+        }
+      })
+      .catch(() => setReportError(true))
+      .finally(() => setChecking(false));
+  }, []);
+
+  if (checking) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <BarChart3 className="size-16 mx-auto mb-4 text-muted-foreground animate-pulse" />
+          <p className="text-muted-foreground">Loading insights...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -1546,9 +1576,15 @@ function InsightsView({ data }: { data: InsightsResponse | null }) {
               <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
                 <li>Open your terminal with an active Claude Code session</li>
                 <li>
-                  Type <code className="bg-background px-2 py-0.5 rounded text-xs font-mono text-foreground">/insight</code> and press Enter
+                  Type{" "}
+                  <code className="bg-background px-2 py-0.5 rounded text-xs font-mono text-foreground">
+                    /insight
+                  </code>{" "}
+                  and press Enter
                 </li>
-                <li>Wait 10-30 seconds while Claude analyzes your usage patterns</li>
+                <li>
+                  Wait 10-30 seconds while Claude analyzes your usage patterns
+                </li>
                 <li>
                   Click{" "}
                   <button
@@ -1570,7 +1606,6 @@ function InsightsView({ data }: { data: InsightsResponse | null }) {
           className="flex-1 w-full border-0"
           sandbox="allow-scripts allow-same-origin"
           title="Claude Code Insights Report"
-          onError={() => setReportError(true)}
         />
       )}
     </div>
