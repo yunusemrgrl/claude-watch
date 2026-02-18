@@ -4,7 +4,7 @@ See what your AI agent is actually doing.
 
 [![npm](https://img.shields.io/npm/v/agent-scope)](https://www.npmjs.com/package/agent-scope)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![version](https://img.shields.io/badge/version-0.5.0-blue)](CHANGELOG.md)
+[![CI](https://github.com/yunusemrgrl/agent-scope/actions/workflows/ci.yml/badge.svg)](https://github.com/yunusemrgrl/agent-scope/actions/workflows/ci.yml)
 
 ---
 
@@ -125,7 +125,7 @@ Append-only JSONL:
 {"task_id":"S1-T3","status":"BLOCKED","reason":"API key missing","timestamp":"2026-02-16T14:35:00Z","agent":"claude"}
 ```
 
-## New in v0.5.0 — Observability Features
+## Observability Features
 
 ### Quality Gates
 
@@ -196,6 +196,10 @@ npm run dev          # Dev server with watch
 ## Stack
 
 TypeScript, Fastify, chokidar, SSE, Next.js, Tailwind, Vitest.
+
+## Contributing
+
+PRs welcome. Open an issue first for anything beyond small fixes. See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## License
 
