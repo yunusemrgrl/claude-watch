@@ -18,6 +18,8 @@ import {
   GitCommit,
   Radio,
   ClipboardList,
+  PanelLeft,
+  PanelLeftClose,
 } from "lucide-react";
 import type {
   SnapshotResponse,
@@ -92,6 +94,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedTaskId, setCopiedTaskId] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
 
   // Detect available modes
@@ -274,6 +277,13 @@ export default function Dashboard() {
       {/* Top Bar */}
       <div className="bg-sidebar border-b border-sidebar-border px-4 py-2 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="p-1.5 rounded hover:bg-sidebar-accent transition-colors"
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {sidebarCollapsed ? <PanelLeft className="size-4" /> : <PanelLeftClose className="size-4" />}
+          </button>
           <div className="flex items-baseline gap-2">
             <h1 className="text-lg font-semibold text-foreground">agent-scope</h1>
             <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">v0.4.0</span>
@@ -345,6 +355,7 @@ export default function Dashboard() {
             getStatusLabel={getStatusLabel}
             handleCopyTaskId={handleCopyTaskId}
             copiedTaskId={copiedTaskId}
+            sidebarCollapsed={sidebarCollapsed}
           />
         ) : (
           <PlanView
@@ -357,6 +368,7 @@ export default function Dashboard() {
             getStatusColor={getStatusColor}
             handleCopyTaskId={handleCopyTaskId}
             copiedTaskId={copiedTaskId}
+            sidebarCollapsed={sidebarCollapsed}
           />
         )}
       </div>
@@ -378,6 +390,7 @@ function LiveView({
   getStatusLabel,
   handleCopyTaskId,
   copiedTaskId,
+  sidebarCollapsed,
 }: {
   sessions: ClaudeSession[];
   selectedSession: ClaudeSession | null;
@@ -390,6 +403,7 @@ function LiveView({
   getStatusLabel: (s: string) => string;
   handleCopyTaskId: (id: string) => void;
   copiedTaskId: boolean;
+  sidebarCollapsed: boolean;
 }) {
   if (sessions.length === 0) {
     return (
@@ -450,7 +464,9 @@ function LiveView({
   return (
     <>
       {/* Session Sidebar */}
-      <div className="w-[220px] bg-sidebar border-r border-sidebar-border flex flex-col">
+      <div className={`bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300 overflow-hidden ${
+        sidebarCollapsed ? "w-0 border-r-0" : "w-[220px]"
+      }`}>
         <div className="p-3 border-b border-sidebar-border">
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
             Sessions
@@ -747,6 +763,7 @@ function PlanView({
   getStatusColor,
   handleCopyTaskId,
   copiedTaskId,
+  sidebarCollapsed,
 }: {
   data: SnapshotResponse | null;
   selectedTask: ComputedTask | null;
@@ -757,6 +774,7 @@ function PlanView({
   getStatusColor: (s: string) => string;
   handleCopyTaskId: (id: string) => void;
   copiedTaskId: boolean;
+  sidebarCollapsed: boolean;
 }) {
   if (!data || !data.snapshot) {
     return (
@@ -820,7 +838,9 @@ function PlanView({
   return (
     <>
       {/* Left Sidebar */}
-      <div className="w-[25%] min-w-[280px] bg-sidebar border-r border-sidebar-border flex flex-col">
+      <div className={`bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300 overflow-hidden ${
+        sidebarCollapsed ? "w-0 min-w-0 border-r-0" : "w-[25%] min-w-[280px]"
+      }`}>
         <ScrollArea className="flex-1">
           <div className="p-3 space-y-3">
             {Object.entries(tasksBySlice).map(([sliceId, tasks]) => (
