@@ -16,3 +16,4 @@ brief.md
 # Auto-generated files
 dashboard/next-env.d.ts
 docs/dev-log.md
+*.png
