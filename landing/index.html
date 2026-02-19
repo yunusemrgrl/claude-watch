@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>claude-watch — See Inside Your AI Agent's Mind</title>
+    <title>claudedash — See Inside Your AI Agent's Mind</title>
     <meta
       name="description"
       content="Live Kanban, Quality Gates, Context Health monitoring for Claude Code agents. One command. Zero setup. No database."
@@ -21,7 +21,7 @@
     <header class="site-header" id="site-header">
       <div class="container nav">
         <a class="logo" href="#top">
-          <span class="logo-bracket">[</span>claude-watch<span class="logo-bracket">]</span>
+          <span class="logo-bracket">[</span>claudedash<span class="logo-bracket">]</span>
         </a>
         <nav class="nav-links">
           <a href="#features">Features</a>
@@ -32,7 +32,7 @@
           <a
             class="btn-star"
             id="star-btn"
-            href="https://github.com/yunusemrgrl/claude-watch"
+            href="https://github.com/yunusemrgrl/claudedash"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -77,7 +77,7 @@
             <div class="hero-ctas" id="hero-ctas">
               <button class="btn-cmd" id="copy-cmd" title="Click to copy">
                 <span class="cmd-dollar">$</span>
-                <span class="cmd-text" id="cmd-text-1">npx -y claude-watch@latest start</span>
+                <span class="cmd-text" id="cmd-text-1">npx -y claudedash@latest start</span>
                 <span class="cmd-copy-icon" aria-label="copy">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
@@ -87,7 +87,7 @@
               </button>
               <a
                 class="btn-ghost-hero"
-                href="https://github.com/yunusemrgrl/claude-watch"
+                href="https://github.com/yunusemrgrl/claudedash"
                 target="_blank"
                 rel="noopener"
               >
@@ -97,7 +97,7 @@
 
             <div class="terminal-hint" id="terminal-hint">
               <span class="th-prompt">~</span>
-              <span class="th-cmd">npx -y claude-watch@latest start</span>
+              <span class="th-cmd">npx -y claudedash@latest start</span>
               <span class="th-arrow">→</span>
               <a class="th-url" href="http://localhost:4317">localhost:4317</a>
               <span class="th-cursor" id="th-cursor">▋</span>
@@ -336,7 +336,7 @@
               </div>
               <img
                 src="assets/screenshot-1.png"
-                alt="claude-watch dashboard — live kanban with sessions sidebar and context health bar"
+                alt="claudedash dashboard — live kanban with sessions sidebar and context health bar"
                 class="sc-img"
               />
             </div>
@@ -366,17 +366,17 @@
                 <button class="term-copy-btn" id="term-copy">copy</button>
               </div>
               <pre class="term-body"><code><span class="t-comment"># Zero-install — always gets the latest version</span>
-<span class="t-prompt">$</span> <span class="t-cmd">npx</span> <span class="t-flag">-y</span> <span class="t-arg">claude-watch@latest</span> <span class="t-cmd">start</span>
+<span class="t-prompt">$</span> <span class="t-cmd">npx</span> <span class="t-flag">-y</span> <span class="t-arg">claudedash@latest</span> <span class="t-cmd">start</span>
 
 <span class="t-comment"># Or install globally</span>
-<span class="t-prompt">$</span> <span class="t-pkg">npm</span> <span class="t-cmd">install</span> <span class="t-flag">-g</span> <span class="t-arg">claude-watch</span>
-<span class="t-prompt">$</span> <span class="t-cmd">claude-watch start</span>
+<span class="t-prompt">$</span> <span class="t-pkg">npm</span> <span class="t-cmd">install</span> <span class="t-flag">-g</span> <span class="t-arg">claudedash</span>
+<span class="t-prompt">$</span> <span class="t-cmd">claudedash start</span>
 
 <span class="t-comment"># Custom project path</span>
-<span class="t-prompt">$</span> <span class="t-cmd">claude-watch start</span> <span class="t-flag">--claude-dir</span> <span class="t-arg">~/my-project/.claude</span>
+<span class="t-prompt">$</span> <span class="t-cmd">claudedash start</span> <span class="t-flag">--claude-dir</span> <span class="t-arg">~/my-project/.claude</span>
 
 <span class="t-out">▶</span> <span class="t-info">Reading ~/.claude/tasks/</span>
-<span class="t-out">▶</span> <span class="t-info">Watching .claude-watch/queue.md</span>
+<span class="t-out">▶</span> <span class="t-info">Watching .claudedash/queue.md</span>
 <span class="t-ok">✓</span> <span class="t-success">Server running at http://localhost:4317</span></code></pre>
             </div>
 
@@ -387,7 +387,7 @@
                   <h3>Run the CLI</h3>
                   <p>
                     Fastify server starts at <code>localhost:4317</code>. Chokidar watches
-                    <code>~/.claude/tasks/</code> and <code>.claude-watch/</code> for changes.
+                    <code>~/.claude/tasks/</code> and <code>.claudedash/</code> for changes.
                   </p>
                 </div>
               </div>
@@ -396,7 +396,7 @@
                 <div>
                   <h3>Agent writes tasks</h3>
                   <p>
-                    Claude Code's <code>TodoWrite</code> tool writes task files. claude-watch
+                    Claude Code's <code>TodoWrite</code> tool writes task files. claudedash
                     picks them up instantly and broadcasts a <code>sessions</code> SSE event.
                   </p>
                 </div>
@@ -423,7 +423,7 @@
             <div class="section-eyebrow">Git Worktrees</div>
             <h2>Multi-repo agent visibility.</h2>
             <p>
-              Running agents across multiple git worktrees? claude-watch maps sessions to branches by
+              Running agents across multiple git worktrees? claudedash maps sessions to branches by
               <code>cwd</code> and shows dirty state, ahead/behind counts, and associated tasks per
               worktree.
             </p>
@@ -437,7 +437,7 @@
           <div class="wt-media" data-animate>
             <img
               src="assets/screenshot-2.png"
-              alt="claude-watch insights panel and worktree visibility"
+              alt="claudedash insights panel and worktree visibility"
             />
           </div>
         </div>
@@ -453,7 +453,7 @@
             <div class="cta-actions">
               <button class="btn-cmd btn-cmd-lg" id="copy-cmd-2" title="Click to copy">
                 <span class="cmd-dollar">$</span>
-                <span class="cmd-text" id="cmd-text-2">npx -y claude-watch@latest start</span>
+                <span class="cmd-text" id="cmd-text-2">npx -y claudedash@latest start</span>
                 <span class="cmd-copy-icon" aria-label="copy">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
@@ -463,7 +463,7 @@
               </button>
               <a
                 class="btn-outline-lg"
-                href="https://github.com/yunusemrgrl/claude-watch"
+                href="https://github.com/yunusemrgrl/claudedash"
                 target="_blank"
                 rel="noopener"
               >
@@ -479,15 +479,15 @@
     <footer class="site-footer">
       <div class="container footer-inner">
         <div class="footer-logo">
-          <span class="logo-bracket">[</span>claude-watch<span class="logo-bracket">]</span>
+          <span class="logo-bracket">[</span>claudedash<span class="logo-bracket">]</span>
         </div>
         <div class="footer-links">
-          <a href="https://github.com/yunusemrgrl/claude-watch" target="_blank" rel="noopener">GitHub</a>
-          <a href="https://www.npmjs.com/package/claude-watch" target="_blank" rel="noopener">npm</a>
-          <a href="https://github.com/yunusemrgrl/claude-watch/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing</a>
-          <a href="https://github.com/yunusemrgrl/claude-watch/blob/main/docs/architecture.md" target="_blank" rel="noopener">Architecture</a>
+          <a href="https://github.com/yunusemrgrl/claudedash" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://www.npmjs.com/package/claudedash" target="_blank" rel="noopener">npm</a>
+          <a href="https://github.com/yunusemrgrl/claudedash/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing</a>
+          <a href="https://github.com/yunusemrgrl/claudedash/blob/main/docs/architecture.md" target="_blank" rel="noopener">Architecture</a>
         </div>
-        <div class="footer-copy">MIT License · © 2026 claude-watch</div>
+        <div class="footer-copy">MIT License · © 2026 claudedash</div>
       </div>
     </footer>
 

@@ -1,5 +1,5 @@
 {
-  "name": "claude-watch-dashboard",
+  "name": "claudedash-dashboard",
   "version": "0.5.3",
   "private": true,
   "scripts": {

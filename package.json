@@ -1,10 +1,10 @@
 {
-  "name": "claude-watch",
+  "name": "claudedash",
   "version": "0.5.3",
   "description": "Live Kanban, quality gates and context health monitoring for Claude Code agents",
   "type": "module",
   "bin": {
-    "claude-watch": "dist/cli.js"
+    "claudedash": "dist/cli.js"
   },
   "files": [
     "dist/",
@@ -34,12 +34,12 @@
   "author": "Yunus Emre Gurlu <yunusemregurlu@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yunusemrgrl/claude-watch.git"
+    "url": "git+https://github.com/yunusemrgrl/claudedash.git"
   },
   "bugs": {
-    "url": "https://github.com/yunusemrgrl/claude-watch/issues"
+    "url": "https://github.com/yunusemrgrl/claudedash/issues"
   },
-  "homepage": "https://github.com/yunusemrgrl/claude-watch#readme",
+  "homepage": "https://github.com/yunusemrgrl/claudedash#readme",
   "license": "MIT",
   "dependencies": {
     "@fastify/cors": "^9.0.1",

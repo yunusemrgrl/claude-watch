@@ -1,4 +1,4 @@
-/* claude-watch landing page — anime.js animations */
+/* claudedash landing page — anime.js animations */
 
 'use strict';
 
@@ -253,7 +253,7 @@ function initCopyButtons() {
 
     btn.addEventListener('click', async () => {
       const textEl = $(textSel);
-      const ok = await copyText('npx -y claude-watch@latest start', textEl, 'copied! ✓');
+      const ok = await copyText('npx -y claudedash@latest start', textEl, 'copied! ✓');
       if (ok) {
         anime({
           targets: btn,
@@ -271,14 +271,14 @@ function initCopyButtons() {
     termBtn.addEventListener('click', () => {
       const code = [
         '# Zero-install — always gets the latest version',
-        'npx -y claude-watch@latest start',
+        'npx -y claudedash@latest start',
         '',
         '# Or install globally',
-        'npm install -g claude-watch',
-        'claude-watch start',
+        'npm install -g claudedash',
+        'claudedash start',
         '',
         '# Custom project path',
-        'claude-watch start --claude-dir ~/my-project/.claude',
+        'claudedash start --claude-dir ~/my-project/.claude',
       ].join('\n');
 
       copyText(code, termBtn, 'copied! ✓');

@@ -1,10 +1,10 @@
-# claude-watch
+# claudedash
 
 See what your AI agent is actually doing.
 
-[![npm](https://img.shields.io/npm/v/claude-watch)](https://www.npmjs.com/package/claude-watch)
+[![npm](https://img.shields.io/npm/v/claudedash)](https://www.npmjs.com/package/claudedash)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CI](https://github.com/yunusemrgrl/claude-watch/actions/workflows/ci.yml/badge.svg)](https://github.com/yunusemrgrl/claude-watch/actions/workflows/ci.yml)
+[![CI](https://github.com/yunusemrgrl/claudedash/actions/workflows/ci.yml/badge.svg)](https://github.com/yunusemrgrl/claudedash/actions/workflows/ci.yml)
 
 ---
 
@@ -12,19 +12,19 @@ See what your AI agent is actually doing.
 
 You tell Claude Code to refactor your auth system. It says "on it." You wait. Terminal scrolls. Minutes pass. You have no idea if it's on task 2 of 12 or stuck in a loop. You're flying blind.
 
-claude-watch fixes that. One command, zero config. It reads Claude Code's own task files and gives you a live Kanban board.
+claudedash fixes that. One command, zero config. It reads Claude Code's own task files and gives you a live Kanban board.
 
 ```bash
-npx -y claude-watch@latest start
+npx -y claudedash@latest start
 ```
 
 That's it. Open `localhost:4317`. Watch your agent work.
 
-![claude-watch demo](docs/screenrecord.gif)
+![claudedash demo](docs/screenrecord.gif)
 
 ## How it works
 
-Claude Code writes task state to `~/.claude/tasks/` when it uses the TodoWrite tool. claude-watch reads those files, watches for changes, and streams updates to your browser via SSE. No database. No auth. No cloud. Just files.
+Claude Code writes task state to `~/.claude/tasks/` when it uses the TodoWrite tool. claudedash reads those files, watches for changes, and streams updates to your browser via SSE. No database. No auth. No cloud. Just files.
 
 **Important:** Claude Code only writes task files when TodoWrite is actively used. To ensure your sessions always appear on the dashboard, add this to your project's `CLAUDE.md`:
 
@@ -34,15 +34,15 @@ At the START of any multi-step task, create a todo list with all steps.
 Mark each task in_progress before starting, completed after finishing.
 ```
 
-Or run `claude-watch init` — it generates a ready-to-use `CLAUDE.md` snippet.
+Or run `claudedash init` — it generates a ready-to-use `CLAUDE.md` snippet.
 
 ## Two modes
 
 | | Live | Plan |
 |---|---|---|
 | **What** | Watch Claude Code work | Structured project planning |
-| **Source** | `~/.claude/tasks/` | `.claude-watch/queue.md` |
-| **Setup** | None | `npx claude-watch init` |
+| **Source** | `~/.claude/tasks/` | `.claudedash/queue.md` |
+| **Setup** | None | `npx claudedash init` |
 | **Use when** | You want visibility | You want control |
 
 Live mode is the default. Plan mode adds dependencies, acceptance criteria, and execution tracking on top.
@@ -55,11 +55,11 @@ Live mode is the default. Plan mode adds dependencies, acceptance criteria, and 
 
 ```bash
 # Zero-install, always latest
-npx -y claude-watch@latest start
+npx -y claudedash@latest start
 
 # Or install globally
-npm i -g claude-watch
-claude-watch start
+npm i -g claudedash
+claudedash start
 ```
 
 ### Plan mode
@@ -67,10 +67,10 @@ claude-watch start
 For structured project execution with task dependencies and acceptance criteria.
 
 ```bash
-claude-watch init
+claudedash init
 ```
 
-This creates `.claude-watch/` with:
+This creates `.claudedash/` with:
 
 | File | Purpose |
 |---|---|
@@ -84,16 +84,16 @@ Then:
 
 1. Edit `queue.md` with your actual tasks
 2. Copy `CLAUDE.md` contents into your project's CLAUDE.md
-3. Tell your agent: *"follow .claude-watch/workflow.md, start with S1-T1"*
-4. Run `claude-watch start` and watch the dashboard
+3. Tell your agent: *"follow .claudedash/workflow.md, start with S1-T1"*
+4. Run `claudedash start` and watch the dashboard
 
 ## CLI
 
 ```bash
-claude-watch start                          # Auto-detect modes, open dashboard
-claude-watch start --claude-dir /path       # Custom Claude directory
-claude-watch start -p 3000                  # Custom port
-claude-watch init                           # Init plan mode in current dir
+claudedash start                          # Auto-detect modes, open dashboard
+claudedash start --claude-dir /path       # Custom Claude directory
+claudedash start -p 3000                  # Custom port
+claudedash init                           # Init plan mode in current dir
 ```
 
 ## Queue format (Plan mode)
@@ -185,8 +185,8 @@ When running agents across multiple git worktrees in parallel, the new **Worktre
 ## Development
 
 ```bash
-git clone https://github.com/yunusemrgrl/claude-watch.git
-cd claude-watch && npm install
+git clone https://github.com/yunusemrgrl/claudedash.git
+cd claudedash && npm install
 cd dashboard && npm install && cd ..
 
 npm run build        # Build core + dashboard

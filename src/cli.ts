@@ -9,25 +9,25 @@ import { startServer } from './server/server.js';
 const program = new Command();
 
 program
-  .name('claude-watch')
+  .name('claudedash')
   .description('Live Kanban, quality gates and context health monitoring for Claude Code agents')
   .version('0.5.3');
 
 program
   .command('init')
-  .description('Initialize claude-watch in current directory')
+  .description('Initialize claudedash in current directory')
   .action(() => {
-    const claudeWatchDir = join(process.cwd(), '.claude-watch');
+    const claudeWatchDir = join(process.cwd(), '.claudedash');
 
-    // Create .claude-watch/ directory
+    // Create .claudedash/ directory
     if (existsSync(claudeWatchDir)) {
-      console.log('⚠️  .claude-watch/ already exists');
+      console.log('⚠️  .claudedash/ already exists');
       process.exit(1);
     }
 
     try {
       mkdirSync(claudeWatchDir);
-      console.log('✓ Created .claude-watch/');
+      console.log('✓ Created .claudedash/');
 
       // Create queue.md with realistic example
       const queueTemplate = `# Slice S1
@@ -82,14 +82,14 @@ AC: All tests pass, edge cases covered
       // Create workflow.md — autonomous execution protocol
       const workflowTemplate = `# Agent Workflow
 
-Autonomous execution protocol for claude-watch Plan mode.
+Autonomous execution protocol for claudedash Plan mode.
 Each task from \`queue.md\` is processed through these phases.
 
 ---
 
 ## Phase 1 — INTAKE
 
-Read the next READY task from \`.claude-watch/queue.md\`.
+Read the next READY task from \`.claudedash/queue.md\`.
 
 1. Parse the task: ID, Area, Description, AC, Dependencies.
 2. Verify all dependencies have status DONE in \`execution.log\`.
@@ -110,7 +110,7 @@ Implement the task.
 
 ## Phase 3 — LOG
 
-Append result to \`.claude-watch/execution.log\` (one JSON line):
+Append result to \`.claudedash/execution.log\` (one JSON line):
 
 Success:
 \`\`\`json
@@ -148,7 +148,7 @@ If no READY tasks remain, stop and report summary.
       console.log('✓ Created workflow.md');
 
       // Create CLAUDE.md snippet file
-      const claudeMdContent = `# claude-watch Integration
+      const claudeMdContent = `# claudedash Integration
 
 ## Task Tracking (MANDATORY)
 
@@ -164,11 +164,11 @@ Rules:
 
 If you skip TodoWrite, the user cannot see what you are doing.
 
-## Plan Mode (if .claude-watch/queue.md exists)
+## Plan Mode (if .claudedash/queue.md exists)
 
-Follow \`.claude-watch/workflow.md\` for structured task execution.
-Tasks are defined in \`.claude-watch/queue.md\`.
-Log progress to \`.claude-watch/execution.log\`.
+Follow \`.claudedash/workflow.md\` for structured task execution.
+Tasks are defined in \`.claudedash/queue.md\`.
+Log progress to \`.claudedash/execution.log\`.
 
 Log format (append one JSON line per task):
 \`\`\`json
@@ -179,16 +179,16 @@ Status values: \`DONE\`, \`FAILED\`, \`BLOCKED\` (requires \`reason\` field)
 
 ## Dashboard
 
-Run \`npx -y claude-watch@latest start\` to view progress.
+Run \`npx -y claudedash@latest start\` to view progress.
 `;
       writeFileSync(join(claudeWatchDir, 'CLAUDE.md'), claudeMdContent);
       console.log('✓ Created CLAUDE.md');
 
       console.log('\n✓ Ready! Next steps:');
-      console.log('  1. Edit .claude-watch/queue.md with your tasks');
-      console.log('  2. Copy .claude-watch/CLAUDE.md contents into your project CLAUDE.md');
-      console.log('  3. Tell your agent: "follow .claude-watch/workflow.md, start with S1-T1"');
-      console.log('  4. Run: npx -y claude-watch@latest start');
+      console.log('  1. Edit .claudedash/queue.md with your tasks');
+      console.log('  2. Copy .claudedash/CLAUDE.md contents into your project CLAUDE.md');
+      console.log('  3. Tell your agent: "follow .claudedash/workflow.md, start with S1-T1"');
+      console.log('  4. Run: npx -y claudedash@latest start');
     } catch (error) {
       console.error('❌ Failed to initialize:', error);
       process.exit(1);
@@ -197,12 +197,12 @@ Run \`npx -y claude-watch@latest start\` to view progress.
 
 program
   .command('start')
-  .description('Start the claude-watch server and dashboard')
+  .description('Start the claudedash server and dashboard')
   .option('--claude-dir <path>', 'Path to Claude directory', join(process.env.HOME || '~', '.claude'))
   .option('-p, --port <number>', 'Port number', '4317')
   .action(async (opts) => {
     const claudeDir = opts.claudeDir;
-    const claudeWatchDir = join(process.cwd(), '.claude-watch');
+    const claudeWatchDir = join(process.cwd(), '.claudedash');
 
     // Detect available modes
     const hasLive = existsSync(join(claudeDir, 'tasks'));
@@ -211,7 +211,7 @@ program
     if (!hasLive && !hasPlan) {
       console.error('❌ No data sources found.');
       console.error(`   Live mode: ${claudeDir}/tasks/ not found`);
-      console.error('   Plan mode: .claude-watch/ not found (run "claude-watch init")');
+      console.error('   Plan mode: .claudedash/ not found (run "claudedash init")');
       process.exit(1);
     }
 
@@ -243,7 +243,7 @@ program
 
       console.log(`✓ Server running on ${url}`);
       if (hasLive) console.log(`  Live mode: watching ${claudeDir}/tasks/`);
-      if (hasPlan) console.log('  Plan mode: reading .claude-watch/');
+      if (hasPlan) console.log('  Plan mode: reading .claudedash/');
       console.log('✓ Opening browser...');
 
       const platform = process.platform;
