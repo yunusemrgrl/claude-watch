@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { mkdirSync, writeFileSync, existsSync } from 'fs';
+import { mkdirSync, writeFileSync, existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
 import { execFile } from 'child_process';
 import { startServer } from './server/server.js';
@@ -268,6 +268,140 @@ program
       console.error('❌ Failed to start server:', error);
       process.exit(1);
     }
+  });
+
+program
+  .command('recover')
+  .description('Summarize the last Claude Code session after /clear')
+  .option('--claude-dir <path>', 'Path to Claude directory', join(process.env.HOME || '~', '.claude'))
+  .action((opts) => {
+    const claudeDir = opts.claudeDir;
+    const projectsDir = join(claudeDir, 'projects');
+
+    if (!existsSync(projectsDir)) {
+      console.error('❌ No projects directory found at', projectsDir);
+      process.exit(1);
+    }
+
+    // Map cwd to Claude project dir name (slashes → hyphens, no leading -)
+    // Walk up from cwd to find a matching project directory
+    let projectDir = '';
+    let searchPath = process.cwd();
+    while (searchPath !== '/') {
+      const candidate = join(projectsDir, searchPath.replace(/\//g, '-'));
+      if (existsSync(candidate)) {
+        projectDir = candidate;
+        break;
+      }
+      searchPath = join(searchPath, '..');
+    }
+
+    if (!projectDir) {
+      console.error(`❌ No session history found for this directory or any parent.`);
+      process.exit(1);
+    }
+
+    // Find most recently modified JSONL file
+    const jsonlFiles = readdirSync(projectDir)
+      .filter(f => f.endsWith('.jsonl'))
+      .map(f => ({ name: f, mtime: statSync(join(projectDir, f)).mtime.getTime() }))
+      .sort((a, b) => b.mtime - a.mtime);
+
+    if (jsonlFiles.length === 0) {
+      console.error('❌ No session files found.');
+      process.exit(1);
+    }
+
+    const latestFile = join(projectDir, jsonlFiles[0].name);
+    const lines = readFileSync(latestFile, 'utf-8').trim().split('\n').filter(Boolean);
+
+    // Extract key info from JSONL
+    let lastUserMsg = '';
+    let lastAssistantText = '';
+    let sessionId = '';
+    let sessionStart = '';
+
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line) as Record<string, unknown>;
+        if (entry.sessionId && !sessionId) {
+          sessionId = String(entry.sessionId);
+        }
+        if (!sessionStart && entry.type === 'user') {
+          const msg = entry.message as Record<string, unknown> | undefined;
+          if (msg?.role === 'user') {
+            const ts = entry.timestamp ?? (entry as Record<string, unknown>).ts;
+            if (ts) sessionStart = String(ts);
+          }
+        }
+        if (entry.type === 'user') {
+          const msg = entry.message as Record<string, unknown> | undefined;
+          const content = msg?.content;
+          if (typeof content === 'string') lastUserMsg = content.slice(0, 200);
+        }
+        if (entry.type === 'assistant') {
+          const msg = entry.message as Record<string, unknown> | undefined;
+          const content = msg?.content;
+          if (Array.isArray(content)) {
+            for (const block of content) {
+              const b = block as Record<string, unknown>;
+              if (b.type === 'text' && typeof b.text === 'string') {
+                lastAssistantText = b.text.slice(0, 400);
+              }
+            }
+          }
+        }
+      } catch { /* skip malformed lines */ }
+    }
+
+    console.log('\n📋 Session Recovery Summary');
+    console.log('─'.repeat(50));
+    console.log(`Session file : ${jsonlFiles[0].name}`);
+    console.log(`Total events : ${lines.length}`);
+    if (sessionStart) console.log(`Started      : ${sessionStart}`);
+
+    if (lastUserMsg) {
+      console.log('\n💬 Last user message:');
+      console.log(`   ${lastUserMsg.replace(/\n/g, '\n   ')}`);
+    }
+
+    if (lastAssistantText) {
+      console.log('\n🤖 Last assistant response (excerpt):');
+      console.log(`   ${lastAssistantText.replace(/\n/g, '\n   ')}`);
+    }
+
+    // Plan mode state
+    const claudeWatchDir = join(process.cwd(), '.claudedash');
+    const logPath = join(claudeWatchDir, 'execution.log');
+    const queuePath = join(claudeWatchDir, 'queue.md');
+
+    if (existsSync(logPath) && existsSync(queuePath)) {
+      console.log('\n📊 Plan Mode State:');
+      const logLines = readFileSync(logPath, 'utf-8').trim().split('\n').filter(Boolean);
+      const doneTasks: string[] = [];
+      let lastTask = '';
+      for (const l of logLines) {
+        try {
+          const e = JSON.parse(l) as Record<string, unknown>;
+          const tid = String(e.task_id ?? '');
+          const status = String(e.status ?? '');
+          if (status === 'DONE') doneTasks.push(tid);
+          lastTask = tid;
+        } catch { /* skip */ }
+      }
+      console.log(`   Completed tasks : ${doneTasks.length} (${doneTasks.join(', ') || 'none'})`);
+      if (lastTask) console.log(`   Last task       : ${lastTask}`);
+
+      // Find next READY task
+      const queueContent = readFileSync(queuePath, 'utf-8');
+      const taskIds = [...queueContent.matchAll(/^## (S\d+-T\d+)/gm)].map(m => m[1]);
+      const doneSet = new Set(doneTasks);
+      const nextTask = taskIds.find(id => !doneSet.has(id));
+      if (nextTask) console.log(`   ➡  Next task    : ${nextTask}`);
+    }
+
+    console.log('\n─'.repeat(50));
+    console.log('Run `claudedash start` to view the live dashboard.\n');
   });
 
 program.parse();
