@@ -40,11 +40,11 @@ Rules:
 
 If you skip TodoWrite, the user cannot see what you are doing.
 
-## Plan Mode (if .agent-scope/queue.md exists)
+## Plan Mode (if .claudedash/queue.md exists)
 
-Follow `.agent-scope/workflow.md` for structured task execution.
-Tasks are defined in `.agent-scope/queue.md`.
-Log progress to `.agent-scope/execution.log`.
+Follow `.claudedash/workflow.md` for structured task execution.
+Tasks are defined in `.claudedash/queue.md`.
+Log progress to `.claudedash/execution.log`.
 
 Log format (append one JSON line per task):
 
@@ -61,4 +61,4 @@ Status values: `DONE`, `FAILED`, `BLOCKED` (requires `reason` field)
 
 ## Dashboard
 
-Run `npx agent-scope start` to view progress.
+Run `npx claudedash start` to view progress.
