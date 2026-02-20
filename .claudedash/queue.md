@@ -1,116 +1,72 @@
-# Slice S1 — Aktif Uyarılar: "Sekmemi Neden Açık Tutayım?"
+# Slice S1 — Plan Mode UX: Add Task + Kanban Toggle
 
 ## S1-T1
 Area: Dashboard
 Priority: critical
 Depends: -
-Description: Web Notification API ile tarayıcı bildirimleri. Görev `DONE` / `FAILED` / `BLOCKED` durumuna geçtiğinde OS seviyesinde bildirim gönder. `Notification.requestPermission()` ilk açılışta çağrılır; kullanıcı reddederse fallback olarak dashboard içi toast gösterilir.
-AC: Chrome/Firefox'ta görev başarısız olduğunda sistem bildirimi çıkar. İzin reddedilirse dashboard sağ üstünde kırmızı banner gösterilir. `src/dashboard/` altındaki bileşene eklenir.
+Description: Plan sidebar'ında "+ Add Task" butonunu en üste taşı (şu an en altta). Sidebar header'ının hemen altına, slice listesinin üstüne yerleştir. Formun davranışı aynı kalacak, sadece konum değişiyor.
+AC: "+ Add Task" butonu Plan sidebar'ında en üstte görünür. Form açılınca input otomatik focus alır.
 
 ## S1-T2
 Area: Dashboard
 Priority: high
 Depends: S1-T1
-Description: Tarayıcı sekme başlığını dinamik güncelle. Format: `[2 aktif] ClaudeDash` ya da `[⚠ 1 hata] ClaudeDash`. Hiçbir aktif görev yoksa normal başlık. SSE olayı geldiğinde güncellenir.
-AC: Görev `in_progress` olduğunda başlıkta sayı görünür. `FAILED` olduğunda ⚠ simgesi eklenir. Tüm sekmeler kapanınca sayı sıfırlanır.
+Description: Plan Mode'a Kanban/Liste görünüm toggle'ı ekle. Header alanına List/Kanban switch butonu koy. Kanban görünümde tasklar READY/IN_PROGRESS/DONE/BLOCKED sütunlarına dağılır (LiveView'daki KanbanColumn bileşenine benzer). Liste görünümü mevcut slice-tree yapısı. State localStorage'da saklansın.
+AC: Toggle ile iki görünüm arası geçiş yapılabiliyor. Kanban'da 4 sütun var (READY, IN_PROGRESS, DONE, BLOCKED). Seçim sayfa yenilemede korunuyor.
 
-## S1-T3
-Area: CLI
-Priority: medium
-Depends: -
-Description: `claudedash start` çalışırken, SSE üzerinden `FAILED` veya `BLOCKED` event geldiğinde terminal'de sesli uyarı + renkli log bas. Node.js `process.stdout.write('\u0007')` (BEL karakteri) ile terminal zil çalar; `chalk` ile kırmızı satır.
-AC: Agent bir task'ı FAILED logladığında terminalde zil çalar ve kırmızı mesaj görünür. `--no-bell` flag ile devre dışı bırakılabilir.
-
-# Slice S2 — TodoWrite Güvenilirliği & Onboarding
+# Slice S2 — Plan Mode Task Detail Yeniden Tasarımı
 
 ## S2-T1
 Area: Dashboard
 Priority: critical
 Depends: -
-Description: Live mode'da TodoWrite verisi yoksa (30 sn boyunca hiç güncelleme gelmezse) "Agent setup eksik" banner'ı göster. Banner `CLAUDE.md`'deki TodoWrite direktifini nasıl ekleyeceğini adım adım açıklar. "Kopyala" butonu ile direktifi panoya alır.
-AC: Yeni kullanıcı `claudedash start` açtığında ve agent TodoWrite kullanmıyorsa 30 sn sonra yönlendirme banner'ı görünür. Banner'daki "Kopyala" butonu çalışır. Görev gelirse banner kaybolur.
+Description: Plan modda taska tıklayınca açılan detail panel'i kaldır. Bunun yerine sağ tarafta her zaman görünür sabit bir "Task Detail" panel yap (selectedTask null ise boş/placeholder göster). Panel genişliği 380px, sol tarafta sidebar + kanban, sağda sabit detail panel. Mevcut detail içeriği (description, AC, deps, quality timeline, agent stats) korunacak ama daha iyi bir layout ile.
+AC: Taska tıklayınca sayfa layout'u değişmiyor. Detail panel her zaman görünür durumda. Seçili task yoksa "Select a task to view details" placeholder gösteriyor.
 
 ## S2-T2
-Area: CLI
-Priority: high
-Depends: -
-Description: `claudedash init` komutu çalışma dizinindeki `CLAUDE.md` dosyasını kontrol eder. TodoWrite direktifi yoksa "CLAUDE.md'ye TodoWrite direktifi eklendi" mesajıyla direktifi otomatik append eder. Dosya yoksa oluşturur.
-AC: Boş bir dizinde `claudedash init` çalıştırmak `CLAUDE.md` dosyasını TodoWrite direktifiyle oluşturur. Direktif zaten varsa duplicate eklenmez.
-
-## S2-T3
 Area: Dashboard
-Priority: medium
+Priority: high
 Depends: S2-T1
-Description: Dashboard sol paneline "Agent Bağlantı Sağlığı" göstergesi ekle: son TodoWrite kaç saniye önce geldi, SSE bağlı mı, kaç aktif session var. Pasif izleme değil, gerçek zamanlı bağlantı kalitesi.
-AC: `/health` endpoint'ine `lastTodoWrite` timestamp ve `connectedClients` alanları eklenir. Dashboard'da yeşil/sarı/kırmızı nokta gösterir.
+Description: Task detail panel içeriğini yeniden düzenle. Üstte task ID + status badge + priority. Ortada description ve AC scrollable alan. Altta quality timeline compact halde. Agent/timing bilgileri küçük badge'ler olarak header'da gösterilsin. "Mark Done" ve "Block" aksiyonları her zaman görünür olsun, tooltip ile.
+AC: Detail panel kompakt ama bilgi yoğun. Scroll gerekmeden kritik bilgiler (id, status, description, AC) görünüyor. Quality ve agent bilgileri ikincil konumda.
 
-# Slice S3 — Tarayıcıdan Kuyruk Editörü
+# Slice S3 — Worktrees Yeniden Tasarımı
 
 ## S3-T1
+Area: Dashboard
+Priority: high
+Depends: -
+Description: Worktrees görünümünü 2 kolonlu grid layout'a çevir. Sol kolon: worktree kartları (branch name büyük, path küçük, dirty/clean badge, ahead/behind sayaçları). Sağ kolon: seçili worktree'nin detayları (associated tasks, HEAD commit, full path). Kart tıklayınca seçilsin, accordion kaldırılsın.
+AC: Grid layout çalışıyor. Worktree kartı seçilince sağda detaylar görünüyor. Accordion expand/collapse yok, direkt seçim var.
+
+# Slice S4 — /usage Kotaları Dashboard'da
+
+## S4-T1
 Area: Server
 Priority: high
 Depends: -
-Description: `PATCH /plan/task/:taskId` endpoint'i ekle. Body: `{ status: 'DONE' | 'BLOCKED', reason?: string }`. `queue.md` dosyasını günceller ve `execution.log`'a yazar. Yalnızca localhost'tan erişilebilir (mevcut CORS politikası yeterli).
-AC: `curl -X PATCH http://localhost:3141/plan/task/S1-T1 -d '{"status":"DONE"}'` queue.md'deki task'ı günceller. SSE ile diğer istemcilere yayınlanır.
-
-## S3-T2
-Area: Dashboard
-Priority: high
-Depends: S3-T1
-Description: Plan Mode panelinde her task kartına "Tamamla" / "Bloke Et" butonları ekle. Tıklanınca `PATCH /plan/task/:taskId` çağrısı yapar ve optimistic UI günceller. Geri al (undo) 5 sn toast ile sunulur.
-AC: Dashboard'dan task durumunu değiştirmek queue.md'yi günceller. SSE aracılığıyla sayfa otomatik yenilenir. Undo butonu 5 sn içinde önceki duruma döner.
-
-## S3-T3
-Area: Dashboard
-Priority: medium
-Depends: S3-T2
-Description: Plan Mode'da "Yeni Görev Ekle" formu. Kısa başlık + öncelik (critical/high/medium/low) + bağımlılık alanları. `POST /plan/task` endpoint ile queue.md'ye yeni blok append eder.
-AC: Dashboard'dan eklenen görev queue.md'de doğru formatta görünür. Zorunlu alan (başlık) boş geçilemez; client-side validasyon.
-
-# Slice S4 — Auth & Takım Paylaşımı
-
-## S4-T1
-Area: CLI
-Priority: high
-Depends: -
-Description: `claudedash start --token <secret>` seçeneği. Token varsa tüm API endpoint'leri `Authorization: Bearer <token>` header kontrolü yapar. Token yoksa (varsayılan) mevcut davranış devam eder. Token CLI'a verilmezse `CLAUDEDASH_TOKEN` env var'ından okunur.
-AC: Token ile başlatılan server'a token'sız GET isteği 401 döner. Doğru token ile 200 döner. Dashboard URL'e `?token=<secret>` eklenerek açılabilir.
+Description: `GET /usage` endpoint ekle. `~/.claude/usage.json` veya benzer dosyayı oku (yoksa Claude API /usage endpoint'ini simüle et). Endpoint: kalan mesaj kotası, kullanılan token miktarı, reset zamanı bilgilerini dönsün. Dosya yoksa 404 + hint dön.
+AC: `curl http://localhost:4317/usage` bir JSON döndürüyor. Hata durumunda anlamlı mesaj var.
 
 ## S4-T2
-Area: Docs
-Priority: medium
+Area: Dashboard
+Priority: high
 Depends: S4-T1
-Description: README'ye "Takımla Paylaşım" bölümü ekle. `--token` kullanım örneği, güvenlik uyarısı (token'ı git'e commit etme), `.env` ile kullanım, local tunnel (ngrok/cloudflared) önerisi.
-AC: README'de "Sharing with your team" H2 başlığı altında en az 3 kod örneği var.
+Description: Top bar'a kullanım kotası widget'ı ekle. SSE dot'un yanına küçük bir "quota" göstergesi: kalan mesaj sayısı veya % olarak. Hover'da detaylı bilgi (reset time, token usage). Veri yoksa widget gizli kalır.
+AC: Kota verisi varsa top bar'da küçük gösterge görünüyor. Tooltip'te detay var. Veri yoksa hiçbir şey gösterilmiyor.
 
-# Slice S5 — Landing & README Yenileme
+# Slice S5 — Session Resume
 
 ## S5-T1
-Area: Docs
-Priority: high
+Area: Dashboard
+Priority: medium
 Depends: -
-Description: Landing footer'ına "Not affiliated with Anthropic" disclaimeri ekle. Ayrıca hero badge'ine veya header nav'ına kısa "Not affiliated with Anthropic" ibaresi ekle (marka riski). Not: Worktrees bölümü landing'de zaten mevcut (`worktrees-section`), features grid'e eklemek gerekmez.
-AC: `landing/index.html` footer'ında "Not affiliated with Anthropic" yazısı var. `npm run build` geçiyor.
+Description: Live Mode session kartlarına "Resume" butonu ekle. `claude resume <sessionId>` komutunu panoya kopyalar ve bir toast gösterir. Session detail panel'inde (sağ slide-in) de bu buton olsun. Tooltip: "Copy 'claude resume <id>' to clipboard".
+AC: Session kartında küçük "Resume" ikonu var. Tıklayınca `claude resume <sessionId>` komutu kopyalanıyor. Toast 3sn görünüyor.
 
 ## S5-T2
-Area: Docs
-Priority: high
-Depends: -
-Description: README.md'yi güncelle: (1) Test sayısını doğru yaz (mevcut `npx vitest run` çıktısıyla eşleştir), (2) CLI komutları tablosuna `recover`, `spec`, `worktree` ekle, (3) API endpoint tablosuna `/claude-insights` ve `?file=` parametresini ekle, (4) "Why claudedash?" bölümüne "Görev başarısız olduğunda bildirim al" maddesini ekle.
-AC: `grep "recover\|spec\|worktree" README.md` sonuç verir. API tablosunda `/claude-insights` satırı var.
-
-# Slice S6 — Uyumluluk & Araçlar
-
-## S6-T1
-Area: Tooling
+Area: Server
 Priority: medium
 Depends: -
-Description: `THIRD_PARTY_NOTICES` dosyası oluştur. `npm ls --json` çıktısından prod bağımlılıkları listele, her paketin lisansını ekle. `claudedash doctor` CLI komutu ekle: Node.js versiyonu, git varlığı, port erişilebilirliği, CLAUDE.md varlığı, `~/.claude/` dizini erişimi kontrol eder.
-AC: Repo kökünde `THIRD_PARTY_NOTICES` dosyası var (en az 10 bağımlılık). `claudedash doctor` komutu tüm kontrolleri ✓/✗ ile raporlar.
-
-## S6-T2
-Area: Tooling
-Priority: medium
-Depends: -
-Description: GitHub Actions workflow'unda action SHA pinleme. Mevcut `actions/checkout@v4` gibi tag kullanımlarını commit SHA ile değiştir (örn. `actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683`). Ayrıca model-aware context health: `/sessions` response'una `modelContextLimit` alanı ekle. Varsayılan 200k; `?model=claude-haiku` sorgusuyla 100k olarak hesaplansın.
-AC: `.github/workflows/ci.yml`'de SHA pinli action referansları var. `GET /sessions?model=claude-haiku` ile dönen sessions'da contextHealth.limit 100000 oluyor.
+Description: `POST /sessions/:id/resume-cmd` endpoint ekle. `{"command": "claude resume <sessionId>", "sessionId": "..."}` döndürür. Dashboard bu endpoint üzerinden komutu alır (client-side fallback da var).
+AC: Endpoint çalışıyor. Dashboard hem endpoint hem de client-side string concat ile komutu üretiyor.

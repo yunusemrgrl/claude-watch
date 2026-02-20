@@ -59,6 +59,8 @@ export function useNotifications() {
   const prevPlanMap = useRef<Map<string, string>>(new Map());
   const initializedLive = useRef(false);
   const initializedPlan = useRef(false);
+  // Track already-notified task+status pairs to prevent spam
+  const notifiedSet = useRef<Set<string>>(new Set());
 
   // Request permission once on mount
   useEffect(() => {
@@ -95,7 +97,11 @@ export function useNotifications() {
               if (initializedLive.current) {
                 const changes = diffLiveTasks(prevLiveMap.current, allTasks);
                 for (const change of changes) {
-                  notify("Task completed ✓", change.subject);
+                  const key = `live:${change.subject}:${change.status}`;
+                  if (!notifiedSet.current.has(key)) {
+                    notifiedSet.current.add(key);
+                    notify("Task completed ✓", change.subject);
+                  }
                 }
               }
 
@@ -118,6 +124,9 @@ export function useNotifications() {
               if (initializedPlan.current) {
                 const changes = diffPlanTasks(prevPlanMap.current, tasks);
                 for (const change of changes) {
+                  const key = `plan:${change.id}:${change.status}`;
+                  if (notifiedSet.current.has(key)) continue;
+                  notifiedSet.current.add(key);
                   if (change.status === "DONE") {
                     notify("Plan task done ✓", `${change.id}: ${change.description}`);
                   } else if (change.status === "FAILED") {

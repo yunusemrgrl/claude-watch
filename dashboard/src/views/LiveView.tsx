@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, RotateCcw } from "lucide-react";
 import type { ClaudeSession, ClaudeTask, TokenUsage } from "@/types";
 import { ContextHealthMini, ContextHealthWidget } from "@/components/ContextHealthWidget";
 import { TypingPrompt } from "@/components/TypingPrompt";
@@ -23,6 +23,7 @@ export function LiveView({
   const [copiedTaskId, setCopiedTaskId] = useState(false);
   const [showSetupBanner, setShowSetupBanner] = useState(false);
   const [copiedSnippet, setCopiedSnippet] = useState(false);
+  const [resumeToast, setResumeToast] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const CLAUDE_MD_SNIPPET = `You MUST use the TodoWrite tool to track your work.\nAt the START of any multi-step task, create a todo list with all steps.\nMark each task in_progress before starting, completed after finishing.`;
@@ -54,6 +55,15 @@ export function LiveView({
     navigator.clipboard.writeText(id);
     setCopiedTaskId(true);
     setTimeout(() => setCopiedTaskId(false), 2000);
+  };
+
+  const handleResumeSession = (sessionId: string) => {
+    const command = `claude resume ${sessionId}`;
+    // Client-side fallback — also hits the endpoint in background for consistency
+    void navigator.clipboard.writeText(command);
+    void fetch(`/sessions/${sessionId}/resume-cmd`, { method: "POST" }).catch(() => {});
+    setResumeToast(command);
+    setTimeout(() => setResumeToast(null), 3000);
   };
 
   // Aggregate context health across sessions that have data
@@ -137,6 +147,16 @@ export function LiveView({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Resume toast */}
+      {resumeToast && (
+        <div className="bg-chart-4/10 border-b border-chart-4/30 px-4 py-2 flex items-center gap-3 text-xs shrink-0">
+          <RotateCcw className="size-3 text-chart-4 shrink-0" />
+          <span className="text-foreground/80">Copied to clipboard:</span>
+          <code className="font-mono text-chart-4 bg-chart-4/10 px-1.5 py-0.5 rounded">{resumeToast}</code>
+          <button onClick={() => setResumeToast(null)} className="ml-auto text-muted-foreground hover:text-foreground">&times;</button>
+        </div>
+      )}
+
       {/* TodoWrite setup banner */}
       {showSetupBanner && (
         <div className="bg-chart-3/10 border-b border-chart-3/30 px-4 py-2.5 flex items-start gap-3 text-xs shrink-0">
@@ -182,8 +202,8 @@ export function LiveView({
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-1">
             {sessions.map((session) => (
+              <div key={session.id} className="relative group">
               <button
-                key={session.id}
                 onClick={() => {
                   setSelectedSession(session);
                   setSelectedTask(null);
@@ -239,6 +259,15 @@ export function LiveView({
                   </div>
                 </div>
               </button>
+              {/* Resume button — outside the main card button to avoid nested interactive elements */}
+              <button
+                onClick={(e) => { e.stopPropagation(); handleResumeSession(session.id); }}
+                title={`Copy 'claude resume ${session.id}' to clipboard`}
+                className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-accent transition-all text-muted-foreground hover:text-foreground"
+              >
+                <RotateCcw className="size-2.5" />
+              </button>
+              </div>
             ))}
           </div>
         </ScrollArea>
@@ -408,7 +437,7 @@ export function LiveView({
                         </div>
                       )}
 
-                      <div className="pt-2 border-t border-border">
+                      <div className="pt-2 border-t border-border space-y-2">
                         <button
                           onClick={() => handleCopyTaskId(selectedTask.id)}
                           className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -425,6 +454,16 @@ export function LiveView({
                             </>
                           )}
                         </button>
+                        {selectedSession && (
+                          <button
+                            onClick={() => handleResumeSession(selectedSession.id)}
+                            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                            title={`Copy 'claude resume ${selectedSession.id}' to clipboard`}
+                          >
+                            <RotateCcw className="size-3" />
+                            <span>Resume session</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   </ScrollArea>

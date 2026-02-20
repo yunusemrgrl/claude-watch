@@ -75,4 +75,12 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
     const model = request.query.model;
     return { session: { ...found, contextHealth: buildContextHealth(found, model) } };
   });
+
+  fastify.post<{ Params: { id: string } }>('/sessions/:id/resume-cmd', async (request, reply) => {
+    const { id } = request.params;
+    const sessions = readSessions(claudeDir);
+    const found = sessions.find(s => s.id === id);
+    if (!found) return reply.code(404).send({ error: 'Session not found' });
+    return { command: `claude resume ${id}`, sessionId: id };
+  });
 }

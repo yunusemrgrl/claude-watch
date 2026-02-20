@@ -52,6 +52,14 @@ const NAV_TABS: {
   },
 ];
 
+interface UsageData {
+  remaining?: number;
+  total?: number;
+  tokensUsed?: number;
+  resetAt?: string;
+  [key: string]: unknown;
+}
+
 export default function Dashboard() {
   const [mode, setMode] = useState<ViewMode>("live");
   const [availableModes, setAvailableModes] = useState({ live: false, plan: false });
@@ -60,9 +68,17 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [usageData, setUsageData] = useState<UsageData | null>(null);
   const { showDeniedBanner, dismissDeniedBanner, sseConnected } = useNotifications();
 
   useEffect(() => { setMounted(true); }, []);
+
+  useEffect(() => {
+    fetch("/usage")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: UsageData | null) => { if (d) setUsageData(d); })
+      .catch(() => { /* no usage data — widget stays hidden */ });
+  }, []);
 
   useEffect(() => {
     fetch("/health")
@@ -181,6 +197,43 @@ export default function Dashboard() {
               className="bg-background border border-border rounded-lg pl-8 pr-3 py-1.5 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:border-ring w-48"
             />
           </div>
+
+          {/* Usage quota widget — hidden when no data */}
+          {usageData && (
+            <Tooltip
+              content={[
+                usageData.remaining != null && usageData.total != null
+                  ? `${String(usageData.remaining)} / ${String(usageData.total)} messages remaining`
+                  : null,
+                usageData.tokensUsed != null
+                  ? `${String(usageData.tokensUsed)} tokens used`
+                  : null,
+                usageData.resetAt
+                  ? `Resets: ${new Date(String(usageData.resetAt)).toLocaleString()}`
+                  : null,
+              ].filter(Boolean).join(" · ") || "Usage data available"}
+              side="bottom"
+            >
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/60 text-xs text-muted-foreground cursor-default">
+                {usageData.remaining != null && usageData.total != null ? (
+                  <>
+                    <span className={`font-medium ${
+                      usageData.remaining / usageData.total < 0.1
+                        ? "text-chart-5"
+                        : usageData.remaining / usageData.total < 0.3
+                          ? "text-chart-3"
+                          : "text-chart-2"
+                    }`}>
+                      {Math.round(usageData.remaining / usageData.total * 100)}%
+                    </span>
+                    <span className="opacity-50">quota</span>
+                  </>
+                ) : (
+                  <span>quota</span>
+                )}
+              </div>
+            </Tooltip>
+          )}
 
           {/* SSE connection indicator */}
           <Tooltip
