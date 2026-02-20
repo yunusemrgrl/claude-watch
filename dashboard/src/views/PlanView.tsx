@@ -9,7 +9,6 @@ import {
   Eye,
   AlertCircle,
   Clock,
-  Bot,
   GitCommit,
   Copy,
   Check,
@@ -107,105 +106,6 @@ function KanbanBoard({
           </div>
         );
       })}
-    </div>
-  );
-}
-
-// ── Overview panel (list mode main area) ─────────────────────────────────────
-function OverviewPanel({
-  snapshot,
-  agentStats,
-  qualityEvents,
-}: {
-  snapshot: NonNullable<ReturnType<typeof usePlanSnapshot>["data"]>["snapshot"];
-  agentStats: Record<string, { done: number; failed: number; totalDuration: number; taskCount: number }>;
-  qualityEvents: QualityEvent[];
-}) {
-  if (!snapshot) return null;
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <ScrollArea className="flex-1">
-        <div className="p-6 space-y-6 max-w-2xl mx-auto">
-          {/* Summary grid */}
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: "Total", value: snapshot.summary.total, cls: "text-foreground border-border" },
-              { label: "Done", value: snapshot.summary.done, cls: "text-chart-2 border-chart-2/30" },
-              { label: "Failed", value: snapshot.summary.failed, cls: "text-chart-5 border-chart-5/30" },
-              { label: "Blocked", value: snapshot.summary.blocked, cls: "text-chart-3 border-chart-3/30" },
-              { label: "Ready", value: snapshot.summary.ready, cls: "text-chart-1 border-chart-1/30" },
-              { label: "Success %", value: `${Math.round(snapshot.summary.successRate * 100)}%`, cls: "text-foreground border-border" },
-            ].map(({ label, value, cls }) => (
-              <div key={label} className={`bg-card border rounded-lg p-4 ${cls}`}>
-                <div className={`text-2xl font-bold ${cls.split(" ")[0]}`}>{value}</div>
-                <div className="text-xs text-muted-foreground mt-1">{label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Slice progress */}
-          <div>
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3">Slice Progress</h4>
-            <div className="space-y-3">
-              {Object.entries(snapshot.slices).map(([sliceId, slice]) => (
-                <div key={sliceId} className="bg-card border border-border rounded-lg p-4">
-                  <div className="flex justify-between mb-2">
-                    <span className="font-semibold text-foreground text-sm">{sliceId}</span>
-                    <span className="text-muted-foreground text-xs">{slice.done}/{slice.total} ({slice.progress}%)</span>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-1.5">
-                    <div className="bg-chart-2 h-1.5 rounded-full transition-all" style={{ width: `${slice.progress}%` }} />
-                  </div>
-                  <div className="flex gap-4 mt-2 text-[11px]">
-                    <span className="text-chart-2">Done: {slice.done}</span>
-                    <span className="text-chart-5">Failed: {slice.failed}</span>
-                    <span className="text-chart-3">Blocked: {slice.blocked}</span>
-                    <span className="text-chart-1">Ready: {slice.ready}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Quality events */}
-          {qualityEvents.length > 0 && (
-            <div>
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3">Quality Checks</h4>
-              <QualityTimeline events={qualityEvents} />
-            </div>
-          )}
-
-          {/* Agent activity */}
-          {Object.keys(agentStats).length > 0 && (
-            <div>
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3">Agent Activity</h4>
-              <div className="space-y-2">
-                {Object.entries(agentStats).map(([agent, stats]) => (
-                  <div key={agent} className="bg-card border border-border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <Bot className="size-4 text-chart-4" />
-                        <span className="font-mono text-sm text-foreground">{agent}</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">{stats.taskCount} tasks</span>
-                    </div>
-                    <div className="flex gap-3 text-xs">
-                      <span className="text-chart-2">{stats.done} done</span>
-                      {stats.failed > 0 && <span className="text-chart-5">{stats.failed} failed</span>}
-                      {stats.totalDuration > 0 && (
-                        <span className="text-muted-foreground flex items-center gap-1">
-                          <Clock className="size-3" />
-                          {stats.totalDuration.toFixed(1)}s
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </ScrollArea>
     </div>
   );
 }
@@ -568,22 +468,6 @@ export function PlanView({
     {} as Record<string, ComputedTask[]>,
   );
 
-  const agentStats = snapshot.tasks.reduce(
-    (acc, task) => {
-      if (task.lastEvent) {
-        const agent = task.lastEvent.agent;
-        if (!acc[agent]) acc[agent] = { done: 0, failed: 0, totalDuration: 0, taskCount: 0 };
-        acc[agent].taskCount++;
-        if (task.lastEvent.status === "DONE") acc[agent].done++;
-        if (task.lastEvent.status === "FAILED") acc[agent].failed++;
-        const dur = task.lastEvent.meta?.duration;
-        if (typeof dur === "number") acc[agent].totalDuration += dur;
-      }
-      return acc;
-    },
-    {} as Record<string, { done: number; failed: number; totalDuration: number; taskCount: number }>,
-  );
-
   return (
     <>
       {/* ── Left Sidebar ────────────────────────────────────────────────── */}
@@ -592,9 +476,21 @@ export function PlanView({
           mounted ? "transition-all duration-300" : ""
         } ${sidebarCollapsed ? "w-0 min-w-0 border-r-0" : "w-72 min-w-[280px]"}`}
       >
-        {/* Sidebar header + view toggle */}
+        {/* Sidebar header + mini stats + view toggle */}
         <div className="px-3 py-2 border-b border-sidebar-border shrink-0 flex items-center gap-2">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex-1">Tasks</span>
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tasks</span>
+          {/* Mini stats */}
+          <div className="flex items-center gap-1.5 text-[10px] flex-1">
+            <span className="text-muted-foreground/50">{snapshot.summary.total}T</span>
+            <span className="text-chart-2 font-medium">{snapshot.summary.done}✓</span>
+            {snapshot.summary.failed > 0 && (
+              <span className="text-chart-5 font-medium">{snapshot.summary.failed}✗</span>
+            )}
+            {snapshot.summary.blocked > 0 && (
+              <span className="text-chart-3 font-medium">{snapshot.summary.blocked}⊘</span>
+            )}
+            <span className="text-chart-1 font-medium">{snapshot.summary.ready}→</span>
+          </div>
           <div className="flex items-center bg-muted rounded p-0.5 gap-0.5">
             <button
               onClick={() => setViewMode("list")}
@@ -713,23 +609,20 @@ export function PlanView({
         </ScrollArea>
       </div>
 
-      {/* ── Main area: Kanban or Overview ───────────────────────────────── */}
-      {viewMode === "kanban" ? (
+      {/* ── Main area: Kanban only (list mode has no middle panel) ──────── */}
+      {viewMode === "kanban" && (
         <KanbanBoard
           tasks={filteredTasks}
           selectedTaskId={selectedTask?.id}
           onSelectTask={setSelectedTask}
         />
-      ) : (
-        <OverviewPanel
-          snapshot={snapshot}
-          agentStats={agentStats}
-          qualityEvents={selectedTask ? [] : []}
-        />
       )}
 
       {/* ── Right detail panel — always visible ─────────────────────────── */}
-      <div className="w-[380px] min-w-[380px] border-l border-border flex flex-col overflow-hidden shrink-0">
+      {/* In list mode: flex-1 (fills remaining space). In kanban: fixed 380px */}
+      <div className={`border-l border-border flex flex-col overflow-hidden ${
+        viewMode === "kanban" ? "w-[380px] min-w-[380px] shrink-0" : "flex-1"
+      }`}>
         {selectedTask ? (
           <TaskDetailPanel
             task={selectedTask}
