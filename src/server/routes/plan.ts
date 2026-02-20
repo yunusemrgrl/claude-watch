@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, appendFileSync } from 'fs';
 import { join } from 'path';
+import type { EventEmitter } from 'events';
 import { parseQueue, type QueueParseConfig } from '../../core/queueParser.js';
 import { parseLog } from '../../core/logParser.js';
 import { computeSnapshot } from '../../core/stateEngine.js';
@@ -12,6 +13,7 @@ import type { Snapshot, InsightsResponse } from '../../core/types.js';
 export interface PlanRouteOptions {
   claudeDir: string;
   agentScopeDir?: string;
+  emitter?: EventEmitter;
 }
 
 function readQueueParseConfig(agentScopeDir: string): QueueParseConfig | undefined {
@@ -25,7 +27,7 @@ function readQueueParseConfig(agentScopeDir: string): QueueParseConfig | undefin
 }
 
 export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOptions): Promise<void> {
-  const { claudeDir, agentScopeDir } = opts;
+  const { claudeDir, agentScopeDir, emitter } = opts;
 
   fastify.get('/snapshot', async () => {
     if (!agentScopeDir) {
@@ -135,6 +137,40 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
     } catch {
       return { events: [] };
     }
+  });
+
+  fastify.patch<{
+    Params: { taskId: string };
+    Body: { status: 'DONE' | 'BLOCKED' | 'FAILED'; reason?: string };
+  }>('/plan/task/:taskId', async (request, reply) => {
+    if (!agentScopeDir) return reply.code(400).send({ error: 'Plan mode not configured' });
+
+    const { taskId } = request.params;
+    const { status, reason } = request.body ?? {};
+
+    if (!['DONE', 'BLOCKED', 'FAILED'].includes(status)) {
+      return reply.code(400).send({ error: 'status must be DONE, BLOCKED, or FAILED' });
+    }
+
+    const logPath = join(agentScopeDir, 'execution.log');
+    const entry: Record<string, unknown> = {
+      task_id: taskId,
+      status,
+      timestamp: new Date().toISOString(),
+      agent: 'dashboard',
+    };
+    if (reason) entry.reason = reason;
+
+    try {
+      appendFileSync(logPath, JSON.stringify(entry) + '\n', 'utf-8');
+    } catch {
+      return reply.code(500).send({ error: 'Failed to write to execution.log' });
+    }
+
+    // Notify SSE clients
+    if (emitter) emitter.emit('change', { type: 'plan', timestamp: new Date().toISOString() });
+
+    return { ok: true, task_id: taskId, status };
   });
 
   fastify.get('/claude-insights', async (_request, reply) => {

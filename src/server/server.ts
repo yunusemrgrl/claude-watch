@@ -56,7 +56,7 @@ export async function startServer(options: ServerOptions): Promise<void> {
   fastify.addHook('onClose', async () => { await watcher.close(); });
 
   await fastify.register(liveRoutes, { claudeDir, agentScopeDir, emitter });
-  await fastify.register(planRoutes, { claudeDir, agentScopeDir });
+  await fastify.register(planRoutes, { claudeDir, agentScopeDir, emitter });
   await fastify.register(observabilityRoutes, { claudeDir });
 
   // Serve static dashboard + SPA fallback
