@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Copy, Check } from "lucide-react";
 import type { ClaudeSession, ClaudeTask, TokenUsage } from "@/types";
 import { ContextHealthMini, ContextHealthWidget } from "@/components/ContextHealthWidget";
@@ -21,6 +21,34 @@ export function LiveView({
   const { sessions, selectedSession, setSelectedSession } = useSessions();
   const [selectedTask, setSelectedTask] = useState<ClaudeTask | null>(null);
   const [copiedTaskId, setCopiedTaskId] = useState(false);
+  const [showSetupBanner, setShowSetupBanner] = useState(false);
+  const [copiedSnippet, setCopiedSnippet] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const CLAUDE_MD_SNIPPET = `You MUST use the TodoWrite tool to track your work.\nAt the START of any multi-step task, create a todo list with all steps.\nMark each task in_progress before starting, completed after finishing.`;
+
+  // Show setup banner if sessions exist but no tasks appear within 30 seconds
+  useEffect(() => {
+    const hasTasks = sessions.some((s) => s.tasks.length > 0);
+    if (hasTasks) {
+      setShowSetupBanner(false);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      return;
+    }
+    if (sessions.length > 0 && !hasTasks) {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setShowSetupBanner(true), 30_000);
+    }
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [sessions]);
+
+  const handleCopySnippet = () => {
+    void navigator.clipboard.writeText(CLAUDE_MD_SNIPPET);
+    setCopiedSnippet(true);
+    setTimeout(() => setCopiedSnippet(false), 2000);
+  };
 
   const handleCopyTaskId = (id: string) => {
     navigator.clipboard.writeText(id);
@@ -108,7 +136,38 @@ export function LiveView({
   };
 
   return (
-    <>
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* TodoWrite setup banner */}
+      {showSetupBanner && (
+        <div className="bg-chart-3/10 border-b border-chart-3/30 px-4 py-2.5 flex items-start gap-3 text-xs shrink-0">
+          <span className="text-chart-3 mt-0.5 shrink-0">⚠</span>
+          <div className="flex-1 text-foreground/80">
+            <span className="font-semibold text-foreground">Agent setup missing.</span>{" "}
+            Sessions are visible but no tasks have appeared in 30 seconds. Add this to your project&apos;s{" "}
+            <code className="bg-muted px-1 rounded">CLAUDE.md</code>:
+            <div className="mt-1.5 font-mono bg-muted/60 rounded px-2 py-1 text-[10px] leading-relaxed whitespace-pre">
+              {CLAUDE_MD_SNIPPET}
+            </div>
+          </div>
+          <button
+            onClick={handleCopySnippet}
+            className="flex items-center gap-1.5 shrink-0 text-chart-3 hover:text-foreground transition-colors border border-chart-3/30 rounded px-2 py-1"
+          >
+            {copiedSnippet ? (
+              <><Check className="size-3" /><span>Copied</span></>
+            ) : (
+              <><Copy className="size-3" /><span>Copy</span></>
+            )}
+          </button>
+          <button
+            onClick={() => setShowSetupBanner(false)}
+            className="text-muted-foreground hover:text-foreground shrink-0 ml-1"
+          >
+            &times;
+          </button>
+        </div>
+      )}
+      <div className="flex-1 flex overflow-hidden">
       {/* Session Sidebar */}
       <div
         className={`bg-sidebar border-r border-sidebar-border flex flex-col overflow-hidden ${
@@ -383,7 +442,8 @@ export function LiveView({
           </div>
         )}
       </div>
-    </>
+      </div>
+    </div>
   );
 }
 
