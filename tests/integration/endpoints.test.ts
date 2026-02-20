@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import staticPlugin from '@fastify/static';
 import { writeFileSync, mkdirSync, rmSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { planRoutes } from '../../src/server/routes/plan.js';
 
 /**
  * Minimal server builder for integration tests.
@@ -60,6 +62,14 @@ async function buildTestServer(agentScopeDir: string, claudeDir: string) {
     }
   });
 
+  await fastify.ready();
+  return fastify;
+}
+
+async function buildPlanServer(agentScopeDir: string, claudeDir: string) {
+  const fastify = Fastify({ logger: false });
+  await fastify.register(staticPlugin, { root: claudeDir });
+  await planRoutes(fastify, { agentScopeDir, claudeDir });
   await fastify.ready();
   return fastify;
 }
@@ -182,5 +192,40 @@ describe('GET /worktrees', () => {
   it('should not 500 when git is unavailable for cwd', async () => {
     const res = await server.inject({ method: 'GET', url: '/worktrees' });
     expect(res.statusCode).toBe(200);
+  });
+});
+
+describe('GET /claude-insights', () => {
+  let tmpDir: string;
+  let server: Awaited<ReturnType<typeof buildPlanServer>>;
+
+  beforeAll(async () => {
+    tmpDir = join(tmpdir(), `agent-scope-test-insights-${Date.now()}`);
+    mkdirSync(join(tmpDir, 'usage-data'), { recursive: true });
+    writeFileSync(
+      join(tmpDir, 'usage-data', 'report.html'),
+      '<!doctype html><html><body><script>window.__xss = true;</script></body></html>'
+    );
+    server = await buildPlanServer(tmpDir, tmpDir);
+  });
+
+  afterAll(async () => {
+    await server.close();
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('should return report HTML with sandbox CSP', async () => {
+    const res = await server.inject({ method: 'GET', url: '/claude-insights' });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-security-policy']).toBe("sandbox; default-src 'none'");
+    expect(String(res.headers['content-type'])).toContain('text/html');
+  });
+
+  it('should return 404 when report file does not exist', async () => {
+    rmSync(join(tmpDir, 'usage-data', 'report.html'));
+    const res = await server.inject({ method: 'GET', url: '/claude-insights' });
+    expect(res.statusCode).toBe(404);
+    const body = JSON.parse(res.payload);
+    expect(body.error).toBe('Claude insights report not found');
   });
 });

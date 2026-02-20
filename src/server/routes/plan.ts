@@ -142,6 +142,7 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
         hint: 'Run /insight command in Claude Code to generate the report'
       });
     }
+    reply.header('Content-Security-Policy', "sandbox; default-src 'none'");
     reply.type('text/html');
     return reply.sendFile('usage-data/report.html', join(claudeDir));
   });
