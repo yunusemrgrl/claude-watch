@@ -93,8 +93,45 @@ Then:
 claudedash start                          # Auto-detect modes, open dashboard
 claudedash start --claude-dir /path       # Custom Claude directory
 claudedash start -p 3000                  # Custom port
+claudedash start --host 0.0.0.0           # Expose to network (shows warning)
+claudedash start --token <secret>         # Enable token auth for sharing
 claudedash init                           # Init plan mode in current dir
+claudedash recover                        # Summarize last session after /clear
+claudedash spec                           # Create spec-mode templates
+claudedash worktree create <branch>       # Create isolated worktree
 ```
+
+## Sharing with your team
+
+By default, claudedash only listens on `127.0.0.1` (localhost). To share the dashboard with a teammate:
+
+```bash
+# 1. Start with a secret token
+claudedash start --token mysecret123
+
+# Or use an environment variable
+CLAUDEDASH_TOKEN=mysecret123 claudedash start
+```
+
+Your teammate can then open the dashboard with the token in the URL:
+
+```
+http://your-host:4317?token=mysecret123
+```
+
+Or pass it as a header:
+
+```bash
+curl -H "Authorization: Bearer mysecret123" http://your-host:4317/sessions
+```
+
+> **Security:** Never commit your token to git. Use `.env` and add it to `.gitignore`. Consider using a local tunnel like [ngrok](https://ngrok.com) or [cloudflared](https://github.com/cloudflare/cloudflared) rather than exposing `--host 0.0.0.0` directly.
+>
+> ```bash
+> # Share via tunnel without network exposure
+> claudedash start --token $(openssl rand -hex 16)
+> ngrok http 4317
+> ```
 
 ## Queue format (Plan mode)
 
@@ -174,13 +211,16 @@ When running agents across multiple git worktrees in parallel, the new **Worktre
 
 | Endpoint | Description |
 |---|---|
-| `GET /health` | Status + available modes |
+| `GET /health` | Status + available modes + `connectedClients` + `lastSessions` |
 | `GET /sessions` | All Claude Code sessions (includes `contextHealth`) |
 | `GET /sessions/:id` | Tasks for a session |
 | `GET /events` | SSE stream |
 | `GET /snapshot` | Plan mode state |
-| `GET /quality-timeline` | Quality check events (filter with `?taskId=`) |
+| `GET /quality-timeline` | Quality check events (filter with `?taskId=` or `?file=`) |
 | `GET /worktrees` | Git worktrees with task associations |
+| `GET /claude-insights` | Claude usage report (sandboxed HTML) |
+| `POST /plan/task` | Add a task to queue.md |
+| `PATCH /plan/task/:id` | Update task status (DONE / BLOCKED / FAILED) |
 
 ## Development
 
@@ -190,7 +230,7 @@ cd claudedash && npm install
 cd dashboard && npm install && cd ..
 
 npm run build        # Build core + dashboard
-npm test             # 163 tests
+npm test             # 165 tests
 npm run dev          # Dev server with watch
 ```
 
