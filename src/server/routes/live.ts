@@ -59,18 +59,20 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
     await new Promise(() => {});
   });
 
-  fastify.get('/sessions', async () => {
+  fastify.get<{ Querystring: { model?: string } }>('/sessions', async (request) => {
+    const model = request.query.model;
     const sessions = readSessions(claudeDir).map(s => ({
       ...s,
-      contextHealth: buildContextHealth(s),
+      contextHealth: buildContextHealth(s, model),
     }));
     return { sessions };
   });
 
-  fastify.get<{ Params: { id: string } }>('/sessions/:id', async (request) => {
+  fastify.get<{ Params: { id: string }; Querystring: { model?: string } }>('/sessions/:id', async (request) => {
     const sessions = readSessions(claudeDir);
     const found = sessions.find(s => s.id === request.params.id);
     if (!found) return { session: null, error: 'Session not found' };
-    return { session: { ...found, contextHealth: buildContextHealth(found) } };
+    const model = request.query.model;
+    return { session: { ...found, contextHealth: buildContextHealth(found, model) } };
   });
 }
