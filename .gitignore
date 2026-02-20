@@ -6,7 +6,7 @@ dashboard/.next/
 coverage/
 .vitest-cache/
 *.log
-.agent-scope/
+.claudedash/
 .DS_Store
 .env
 

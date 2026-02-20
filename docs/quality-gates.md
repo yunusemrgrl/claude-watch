@@ -1,10 +1,10 @@
 # Quality Gates
 
-agent-scope can track quality check results (lint, typecheck, test) per task and display them as a chronological timeline in the Plan mode dashboard.
+claudedash can track quality check results (lint, typecheck, test) per task and display them as a chronological timeline in the Plan mode dashboard.
 
 ## Logging quality checks
 
-When your agent completes a task, append a log entry to `.agent-scope/execution.log` that includes a `meta.quality` field:
+When your agent completes a task, append a log entry to `.claudedash/execution.log` that includes a `meta.quality` field:
 
 ```json
 {
@@ -39,7 +39,7 @@ All three quality fields are optional — include only the checks you ran.
 Add this to your project's `CLAUDE.md` to instruct your agent to log quality results:
 
 ```markdown
-After completing a task, log quality check results to .agent-scope/execution.log:
+After completing a task, log quality check results to .claudedash/execution.log:
 {
   "task_id": "<ID>",
   "status": "DONE",

@@ -90,7 +90,7 @@ export function PlanView({
                 </div>
               )) || (
                 <div className="text-muted-foreground text-sm">
-                  Run &quot;agent-scope init&quot; to set up Plan mode
+                  Run &quot;claudedash init&quot; to set up Plan mode
                 </div>
               )}
             </div>
@@ -630,7 +630,7 @@ export function PlanView({
             <TypingPrompt
               lines={[
                 "Select a task from the sidebar to view details",
-                "agent-scope init  →  create .agent-scope/",
+                "claudedash init  →  create .claudedash/",
                 "Define tasks in queue.md with dependencies",
                 "Agent logs progress to execution.log",
                 "Watch your workflow unfold in real-time",

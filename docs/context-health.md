@@ -1,6 +1,6 @@
 # Context Health Monitoring
 
-agent-scope estimates how much of Claude's context window is being used and surfaces this information in the Live mode dashboard.
+claudedash estimates how much of Claude's context window is being used and surfaces this information in the Live mode dashboard.
 
 ## What is context health?
 
@@ -73,6 +73,6 @@ Each session object includes a `contextHealth` field:
 
 ## Troubleshooting
 
-**Context always shows `–`:** agent-scope reads token usage from `~/.claude/projects/<project>/<session>.jsonl`. If this file doesn't contain `usage` fields (which are written by the Claude API), context health cannot be estimated. This typically means the session predates API usage logging or was started without network access.
+**Context always shows `–`:** claudedash reads token usage from `~/.claude/projects/<project>/<session>.jsonl`. If this file doesn't contain `usage` fields (which are written by the Claude API), context health cannot be estimated. This typically means the session predates API usage logging or was started without network access.
 
 **Percentage seems higher/lower than expected:** The estimate is based on input tokens only, which is the best available proxy for context window usage. It does not account for model-internal tokenization differences. Expect ±5–15% variance.

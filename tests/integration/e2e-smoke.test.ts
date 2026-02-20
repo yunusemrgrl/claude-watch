@@ -69,8 +69,8 @@ describe('E2E Smoke — Live Mode + Quality + Context + Worktrees', () => {
   beforeAll(async () => {
     // --- Create realistic directory structure ---
     sessionId = 'e2e-smoke-session-001';
-    tmpClaudeDir = join(tmpdir(), `agent-scope-e2e-${Date.now()}`);
-    tmpAgentScopeDir = join(tmpClaudeDir, '.agent-scope');
+    tmpClaudeDir = join(tmpdir(), `claudedash-e2e-${Date.now()}`);
+    tmpAgentScopeDir = join(tmpClaudeDir, '.claudedash');
 
     // Create session task files (legacy tasks/ format — individual JSON per task)
     const tasksDir = join(tmpClaudeDir, 'tasks', sessionId);

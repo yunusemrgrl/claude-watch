@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to agent-scope are documented here.
+All notable changes to claudedash are documented here.
 
 ## [0.5.0] — 2026-02-18
 

@@ -79,7 +79,7 @@ describe('GET /quality-timeline', () => {
   let server: Awaited<ReturnType<typeof buildTestServer>>;
 
   beforeAll(async () => {
-    tmpDir = join(tmpdir(), `agent-scope-test-${Date.now()}`);
+    tmpDir = join(tmpdir(), `claudedash-test-${Date.now()}`);
     mkdirSync(tmpDir, { recursive: true });
     server = await buildTestServer(tmpDir, tmpDir);
   });
@@ -149,7 +149,7 @@ describe('GET /sessions (context health)', () => {
   let server: Awaited<ReturnType<typeof buildTestServer>>;
 
   beforeAll(async () => {
-    tmpDir = join(tmpdir(), `agent-scope-test-session-${Date.now()}`);
+    tmpDir = join(tmpdir(), `claudedash-test-session-${Date.now()}`);
     mkdirSync(tmpDir, { recursive: true });
     server = await buildTestServer(tmpDir, tmpDir);
   });
@@ -172,7 +172,7 @@ describe('GET /worktrees', () => {
   let server: Awaited<ReturnType<typeof buildTestServer>>;
 
   beforeAll(async () => {
-    tmpDir = join(tmpdir(), `agent-scope-test-wt-${Date.now()}`);
+    tmpDir = join(tmpdir(), `claudedash-test-wt-${Date.now()}`);
     mkdirSync(tmpDir, { recursive: true });
     server = await buildTestServer(tmpDir, tmpDir);
   });
@@ -200,7 +200,7 @@ describe('GET /claude-insights', () => {
   let server: Awaited<ReturnType<typeof buildPlanServer>>;
 
   beforeAll(async () => {
-    tmpDir = join(tmpdir(), `agent-scope-test-insights-${Date.now()}`);
+    tmpDir = join(tmpdir(), `claudedash-test-insights-${Date.now()}`);
     mkdirSync(join(tmpDir, 'usage-data'), { recursive: true });
     writeFileSync(
       join(tmpDir, 'usage-data', 'report.html'),

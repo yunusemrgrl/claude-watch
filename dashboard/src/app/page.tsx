@@ -78,7 +78,7 @@ export default function Dashboard() {
             )}
           </button>
           <div className="flex items-baseline gap-2">
-            <h1 className="text-lg font-semibold text-foreground">agent-scope</h1>
+            <h1 className="text-lg font-semibold text-foreground">claudedash</h1>
             <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
               v0.5.4
             </span>

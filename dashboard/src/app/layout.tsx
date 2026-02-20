@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "agent-scope",
+  title: "claudedash",
   description: "Execution observer for AI agent workflows",
 };
 

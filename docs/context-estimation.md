@@ -2,7 +2,7 @@
 
 ## Chosen Approach: Token-Based Approximation
 
-Context percentage is estimated from the `tokenUsage` field stored in each session's JSONL file. When Claude Code logs a turn, it records `usage` in message objects, which agent-scope parses into cumulative `inputTokens`, `outputTokens`, `cacheCreationTokens`, and `cacheReadTokens`.
+Context percentage is estimated from the `tokenUsage` field stored in each session's JSONL file. When Claude Code logs a turn, it records `usage` in message objects, which claudedash parses into cumulative `inputTokens`, `outputTokens`, `cacheCreationTokens`, and `cacheReadTokens`.
 
 ### Estimation Formula
 

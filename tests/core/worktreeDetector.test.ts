@@ -168,7 +168,7 @@ describe('enrichWorktreeStatus', () => {
   it('should detect dirty status in current repo', async () => {
     // Use the actual project directory which is a git repo
     const worktree = {
-      path: '/home/yunus/Projects/agent-scope',
+      path: '/home/yunus/Projects/claudedash',
       head: 'abc',
       branch: 'main',
       dirty: false,

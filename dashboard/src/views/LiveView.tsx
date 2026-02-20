@@ -55,7 +55,7 @@ export function LiveView({
         <TypingPrompt
           lines={[
             "Start a Claude Code session to see tasks here",
-            "npx agent-scope start  →  launch dashboard",
+            "npx claudedash start  →  launch dashboard",
             "Agent uses TodoWrite to track progress",
             "Sessions appear here in real-time",
           ]}

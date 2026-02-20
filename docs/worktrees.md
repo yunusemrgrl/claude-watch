@@ -1,6 +1,6 @@
 # Worktree Observability
 
-When running multiple Claude Code sessions in parallel across different git worktrees, agent-scope can show you which branch each session is working in, whether its worktree is clean, and which tasks are associated with it.
+When running multiple Claude Code sessions in parallel across different git worktrees, claudedash can show you which branch each session is working in, whether its worktree is clean, and which tasks are associated with it.
 
 ## What is a git worktree?
 
@@ -37,13 +37,13 @@ The panel auto-refreshes every 30 seconds and has a manual refresh button.
 
 ## How task association works
 
-agent-scope matches sessions to worktrees by comparing `session.cwd` against `worktree.path`. It uses **longest-prefix matching** — if a session's cwd is `/home/user/project/sub`, it will be matched to the worktree at `/home/user/project/sub` rather than `/home/user/project`.
+claudedash matches sessions to worktrees by comparing `session.cwd` against `worktree.path`. It uses **longest-prefix matching** — if a session's cwd is `/home/user/project/sub`, it will be matched to the worktree at `/home/user/project/sub` rather than `/home/user/project`.
 
 If multiple sessions share the same worktree (e.g. parallel agents), all their tasks appear in the expanded worktree row.
 
 ## Dirty detection and ahead/behind tracking
 
-When loading the worktree panel, agent-scope runs:
+When loading the worktree panel, claudedash runs:
 
 1. `git status --porcelain` to detect uncommitted changes (dirty = any output)
 2. `git rev-list --left-right --count HEAD...@{u}` to count ahead/behind commits

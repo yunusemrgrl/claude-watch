@@ -7,16 +7,16 @@
 │  Claude Code session (agent process)                                │
 │                                                                     │
 │  TodoWrite tool ──────────────► ~/.claude/tasks/<session-id>.json  │
-│  execution.log  ──────────────► .agent-scope/execution.log         │
-│  queue.md       ──────────────► .agent-scope/queue.md              │
+│  execution.log  ──────────────► .claudedash/execution.log         │
+│  queue.md       ──────────────► .claudedash/queue.md              │
 └──────────────────────┬──────────────────────────────────────────────┘
                        │ filesystem changes
                        ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  agent-scope server (Fastify)                                       │
+│  claudedash server (Fastify)                                       │
 │                                                                     │
 │  watcher.ts (chokidar)                                              │
-│    watches ~/.claude/ and .agent-scope/                             │
+│    watches ~/.claude/ and .claudedash/                             │
 │    emits WatchEvent { type: 'sessions' | 'plan' }                  │
 │         │                                                           │
 │         ▼                                                           │
@@ -90,7 +90,7 @@
 2. **Watcher fires**: `watcher.ts` (chokidar) detects the change and emits a `WatchEvent`:
    ```ts
    { type: 'sessions' }   // for .claude/tasks/* changes
-   { type: 'plan' }       // for .agent-scope/* changes
+   { type: 'plan' }       // for .claudedash/* changes
    ```
 
 3. **SSE broadcast**: `routes/live.ts` has registered a `change` listener on the emitter. When it fires, it writes the event to all open SSE connections:

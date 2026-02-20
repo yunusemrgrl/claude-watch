@@ -29,5 +29,5 @@ dashboard/next.config.mjs
 .gitignore
 
 # Runtime directories
-.agent-scope/
+.claudedash/
 node_modules/
