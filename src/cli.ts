@@ -259,10 +259,91 @@ Add to your Claude Code hooks configuration:
 4. Set loop_limit to 3 to prevent infinite loops
 `;
 
+      const postToolUseHook = `# PostToolUse Hook — Quality Gate
+
+Runs automatically after Bash, Edit, or Write tool calls.
+Register in Claude Code settings under Hooks → PostToolUse.
+
+## Purpose
+Run lint and typecheck after every code change and record results
+in execution.log so the Quality Gates dashboard panel can display them.
+
+## Hook Configuration
+
+\`\`\`json
+{
+  "hook": "PostToolUse",
+  "matcher": { "tool_name": ["Bash", "Edit", "Write"] },
+  "command": "npm run lint --silent 2>/dev/null && npx tsc --noEmit 2>/dev/null",
+  "on_success": {
+    "append_to": ".claudedash/execution.log",
+    "line": {"task_id":"{{task_id}}","status":"QUALITY","timestamp":"{{iso}}","agent":"claude","meta":{"quality":{"lint":true,"typecheck":true}}}
+  },
+  "on_failure": {
+    "append_to": ".claudedash/execution.log",
+    "line": {"task_id":"{{task_id}}","status":"QUALITY","timestamp":"{{iso}}","agent":"claude","meta":{"quality":{"lint":false,"typecheck":false}}}
+  }
+}
+\`\`\`
+
+## Manual Usage
+
+After any code change, run:
+\`\`\`bash
+npm run lint && npx tsc --noEmit
+\`\`\`
+Then append to execution.log:
+\`\`\`json
+{"task_id":"S1-T1","status":"QUALITY","timestamp":"2026-01-15T10:30:00Z","agent":"claude","meta":{"quality":{"lint":true,"typecheck":true}}}
+\`\`\`
+`;
+
+      const tddHook = `# TDD Enforcement Hook
+
+Warns when a new source file is created without a corresponding test file.
+
+## Naming Conventions Checked
+
+| Source file          | Expected test file                  |
+|----------------------|-------------------------------------|
+| src/foo.ts           | tests/foo.test.ts or foo.spec.ts    |
+| src/core/bar.ts      | tests/core/bar.test.ts              |
+| lib/baz.py           | test_baz.py or baz_test.py          |
+| pkg/qux.go           | qux_test.go                         |
+
+## Skip List (configure in .claudedash/config.json)
+
+\`\`\`json
+{
+  "tddHook": {
+    "skipPatterns": ["src/cli.ts", "src/server/server.ts", "**/*.d.ts"]
+  }
+}
+\`\`\`
+
+## Hook Configuration
+
+\`\`\`json
+{
+  "hook": "PostToolUse",
+  "matcher": { "tool_name": ["Write"], "file_pattern": "src/**/*.ts" },
+  "script": ".claudedash/hooks/tdd-check.sh"
+}
+\`\`\`
+
+## Behavior
+
+- If a matching test file exists → silent pass
+- If no test file found → prints a warning (does NOT block)
+- Agent should create the test file before marking the task DONE
+`;
+
       writeFileSync(join(claudeWatchDir, 'hooks', 'pre-compact.md'), preCompactHook);
       writeFileSync(join(claudeWatchDir, 'hooks', 'post-compact.md'), postCompactHook);
       writeFileSync(join(claudeWatchDir, 'hooks', 'stop.md'), stopHook);
-      console.log('✓ Created hooks/ (pre-compact, post-compact, stop)');
+      writeFileSync(join(claudeWatchDir, 'hooks', 'post-tool-use.md'), postToolUseHook);
+      writeFileSync(join(claudeWatchDir, 'hooks', 'tdd-enforcement.md'), tddHook);
+      console.log('✓ Created hooks/ (pre-compact, post-compact, stop, post-tool-use, tdd-enforcement)');
 
       console.log('\n✓ Ready! Next steps:');
       console.log('  1. Edit .claudedash/queue.md with your tasks');

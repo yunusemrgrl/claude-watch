@@ -119,7 +119,7 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
     return response;
   });
 
-  fastify.get<{ Querystring: { taskId?: string } }>('/quality-timeline', async (request) => {
+  fastify.get<{ Querystring: { taskId?: string; file?: string } }>('/quality-timeline', async (request) => {
     if (!agentScopeDir) return { events: [] };
     const logPath = join(agentScopeDir, 'execution.log');
     if (!existsSync(logPath)) return { events: [] };
@@ -127,6 +127,9 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
       let events = parseQualityTimeline(readFileSync(logPath, 'utf-8'));
       if (request.query.taskId) {
         events = events.filter(e => e.taskId === request.query.taskId);
+      }
+      if (request.query.file) {
+        events = events.filter(e => e.file === request.query.file);
       }
       return { events };
     } catch {
