@@ -17,6 +17,7 @@ import { WorktreePanel } from "@/components/WorktreePanel";
 import { LiveView } from "@/views/LiveView";
 import { PlanView } from "@/views/PlanView";
 import { InsightsView } from "@/views/InsightsView";
+import { useNotifications } from "@/hooks/useNotifications";
 type ViewMode = "live" | "plan" | "insights" | "worktrees";
 
 export default function Dashboard() {
@@ -27,6 +28,7 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const { showDeniedBanner, dismissDeniedBanner } = useNotifications();
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -63,6 +65,20 @@ export default function Dashboard() {
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
+      {/* Notification permission denied banner */}
+      {showDeniedBanner && (
+        <div className="bg-destructive/10 border-b border-destructive/30 px-4 py-2 flex items-center justify-between text-xs text-destructive shrink-0">
+          <span>
+            Browser notifications are blocked. Enable them in your browser settings to get alerts when tasks fail or complete.
+          </span>
+          <button
+            onClick={dismissDeniedBanner}
+            className="ml-4 text-destructive/70 hover:text-destructive font-medium shrink-0"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       {/* Top Bar */}
       <div className="bg-sidebar border-b border-sidebar-border px-4 py-2 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">

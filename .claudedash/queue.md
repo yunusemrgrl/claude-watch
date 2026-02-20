@@ -1,149 +1,123 @@
-# Slice S1 — Güvenlik
+# Slice S1 — Aktif Uyarılar: "Sekmemi Neden Açık Tutayım?"
 
 ## S1-T1
-Area: Server
+Area: Dashboard
 Priority: critical
 Depends: -
-Description: Fastify sunucusunu 0.0.0.0 yerine 127.0.0.1'e bind et. Opsiyonel --host flag'i ile kullanıcı açıkça isterse ağ erişimi açılabilir; bu durumda terminal'de uyarı gösterilir.
-AC: Server varsayılan olarak yalnızca localhost'ta dinler. `claudedash start --host 0.0.0.0` çalışır ve "⚠️ exposed to network" uyarısı basar.
+Description: Web Notification API ile tarayıcı bildirimleri. Görev `DONE` / `FAILED` / `BLOCKED` durumuna geçtiğinde OS seviyesinde bildirim gönder. `Notification.requestPermission()` ilk açılışta çağrılır; kullanıcı reddederse fallback olarak dashboard içi toast gösterilir.
+AC: Chrome/Firefox'ta görev başarısız olduğunda sistem bildirimi çıkar. İzin reddedilirse dashboard sağ üstünde kırmızı banner gösterilir. `src/dashboard/` altındaki bileşene eklenir.
 
 ## S1-T2
-Area: Server
-Priority: critical
+Area: Dashboard
+Priority: high
 Depends: S1-T1
-Description: CORS politikasını wildcard `origin: true`'dan `http://localhost:{port}` ve `http://127.0.0.1:{port}` ile sınırla. Port dinamik olarak config'den alınır.
-AC: Cross-origin istekler farklı origin'den reddedilir. Dashboard kendi origin'inden çalışmaya devam eder.
+Description: Tarayıcı sekme başlığını dinamik güncelle. Format: `[2 aktif] ClaudeDash` ya da `[⚠ 1 hata] ClaudeDash`. Hiçbir aktif görev yoksa normal başlık. SSE olayı geldiğinde güncellenir.
+AC: Görev `in_progress` olduğunda başlıkta sayı görünür. `FAILED` olduğunda ⚠ simgesi eklenir. Tüm sekmeler kapanınca sayı sıfırlanır.
 
 ## S1-T3
-Area: Server
-Priority: high
-Depends: S1-T2
-Description: /claude-insights endpoint'i HTML dosyasını doğrudan text/html olarak serve ediyor. `sandbox; default-src 'none'` CSP header'ı ile iframe içinde sun veya Content-Disposition: attachment kullan.
-AC: HTML report browser'da script çalıştıramaz. Manuel test: Chrome DevTools'da CSP violation olmaz, eski yöntemle console'da XSS çalışmaz.
-
-## S1-T4
-Area: Server
-Priority: high
-Depends: S1-T1
-Description: @fastify/rate-limit ekle. Localhost istekleri (127.0.0.1, ::1) limitsiz; uzak bağlantılar için 100 istek/dakika sınırı. 429 yanıtında Retry-After header'ı gönderilir.
-AC: `npm ls @fastify/rate-limit` paketi gösterir. Uzak IP'den 101. istek 429 döner.
-
-## S1-T5
 Area: CLI
 Priority: medium
 Depends: -
-Description: src/cli.ts'de tarayıcı açmak için kullanılan `exec()` çağrısını `execFile()` ile değiştir. URL her zaman sabit port'tan gelir ama tutarlılık açısından tüm child_process kullanımı execFile olmalı.
-AC: cli.ts'de `exec(` ifadesi kalmaz. Mevcut testler geçer.
+Description: `claudedash start` çalışırken, SSE üzerinden `FAILED` veya `BLOCKED` event geldiğinde terminal'de sesli uyarı + renkli log bas. Node.js `process.stdout.write('\u0007')` (BEL karakteri) ile terminal zil çalar; `chalk` ile kırmızı satır.
+AC: Agent bir task'ı FAILED logladığında terminalde zil çalar ve kırmızı mesaj görünür. `--no-bell` flag ile devre dışı bırakılabilir.
 
-# Slice S2 — Teknik Borç
+# Slice S2 — TodoWrite Güvenilirliği & Onboarding
 
 ## S2-T1
-Area: Docs
-Priority: high
+Area: Dashboard
+Priority: critical
 Depends: -
-Description: LICENSE dosyasındaki telif hakkı adını "agent-scope contributors"'dan "claudedash contributors"'a güncelle.
-AC: `grep -r "agent-scope" LICENSE` sonuç döndürmez.
+Description: Live mode'da TodoWrite verisi yoksa (30 sn boyunca hiç güncelleme gelmezse) "Agent setup eksik" banner'ı göster. Banner `CLAUDE.md`'deki TodoWrite direktifini nasıl ekleyeceğini adım adım açıklar. "Kopyala" butonu ile direktifi panoya alır.
+AC: Yeni kullanıcı `claudedash start` açtığında ve agent TodoWrite kullanmıyorsa 30 sn sonra yönlendirme banner'ı görünür. Banner'daki "Kopyala" butonu çalışır. Görev gelirse banner kaybolur.
 
 ## S2-T2
-Area: Docs
+Area: CLI
 Priority: high
-Depends: S2-T1
-Description: CONTRIBUTING.md başlığındaki "agent-scope" ibaresini ve ölü clone URL'ini (`yunusemrgrl/agent-scope`) düzelt. Doğru URL: `yunusemrgrl/claudedash`.
-AC: `grep -r "agent-scope" CONTRIBUTING.md` sonuç döndürmez. Clone URL çalışır.
+Depends: -
+Description: `claudedash init` komutu çalışma dizinindeki `CLAUDE.md` dosyasını kontrol eder. TodoWrite direktifi yoksa "CLAUDE.md'ye TodoWrite direktifi eklendi" mesajıyla direktifi otomatik append eder. Dosya yoksa oluşturur.
+AC: Boş bir dizinde `claudedash init` çalıştırmak `CLAUDE.md` dosyasını TodoWrite direktifiyle oluşturur. Direktif zaten varsa duplicate eklenmez.
 
 ## S2-T3
-Area: Docs
-Priority: high
-Depends: -
-Description: Repo kökündeki CLAUDE.md'de Plan Mode yolu `.agent-scope/queue.md` yerine `.claudedash/queue.md` olarak güncellenmeli. `npx agent-scope start` → `npx claudedash start` olarak düzelt.
-AC: CLAUDE.md'de "agent-scope" ve "agent_scope" ifadesi kalmaz.
-
-## S2-T4
-Area: Core
-Priority: high
-Depends: -
-Description: src/server/watcher.ts classifyEvent fonksiyonundaki `.agent-scope` path kontrolü `.claudedash` olarak güncellenmeli.
-AC: `grep -r "agent-scope" src/` sonuç döndürmez. Plan mode olayları doğru sınıflandırılır.
-
-## S2-T5
-Area: Docs
-Priority: medium
-Depends: -
-Description: Repo kökünde SECURITY.md dosyası oluştur. GitHub'ın standart şablonunu kullan: güvenlik açığı bildirme süreci, iletişim e-postası, kapsam dışı konular.
-AC: GitHub "Security" sekmesinde policy görünür. `gh api repos/yunusemrgrl/claudedash --jq .security_and_analysis` security policy enabled döner.
-
-## S2-T6
-Area: Tooling
-Priority: medium
-Depends: -
-Description: ESLint ekle. En az şu kurallar aktif olmalı: no-floating-promises, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars. CI'a lint adımı ekle.
-AC: `npm run lint` komutu çalışır. Mevcut kod temiz geçer. CI lint hatası varsa fail olur.
-
-## S2-T7
-Area: Tooling
-Priority: medium
-Depends: -
-Description: Dependabot'u etkinleştir. `.github/dependabot.yml` oluştur: npm ekosistemi için haftalık güncelleme PR'ları, GitHub Actions için haftalık pin güncellemeleri.
-AC: `.github/dependabot.yml` commit'lendi. GitHub'da Dependabot alerts ve updates aktif.
-
-# Slice S3 — Oturum Sürekliliği
-
-## S3-T1
-Area: Core
-Priority: high
-Depends: -
-Description: `/clear` komutu sonrası oturum kurtarma özelliği. `~/.claude/projects/` dizinindeki önceki oturum JSONL dosyalarını tarayarak son aktif planlama durumunu özetle ve terminale yansıt. Python veya Node ile stdlib-only implementasyon.
-AC: Kullanıcı `/clear` yaptıktan sonra `claudedash recover` komutu son oturumdan ne yapıldığını, hangi görevin kaldığını özetler.
-
-## S3-T2
-Area: Core
-Priority: medium
-Depends: S3-T1
-Description: Pre-compact ve Post-compact hook şablonları ekle. `claudedash init` çıktısına dahil edilsin. Pre-compact: aktif plan durumu ve görev sayısını kaydet. Post-compact: kaydedilen durumu context'e yeniden enjekte et.
-AC: `claudedash init` sonrası `.claudedash/` içinde `hooks/pre-compact.md` ve `hooks/post-compact.md` şablonları bulunur. Kılavuzda nasıl kurulacağı açıklanır.
-
-## S3-T3
-Area: Core
-Priority: medium
-Depends: S3-T2
-Description: Stop hook şablonu: görev tamamlanmadan agent'ın durmasını engelle. `followup_message` ile eksik görevler varsa devam et. `loop_limit: 3` ile sonsuz döngü engelle.
-AC: `.claudedash/hooks/stop.md` şablonu mevcut. Döngü sınırı belgelenmiş.
-
-# Slice S4 — Kalite Kapıları Genişletme
-
-## S4-T1
-Area: Core
-Priority: high
-Depends: -
-Description: PostToolUse hook şablonu: Bash/Edit/Write araç çağrısı sonrası otomatik lint ve typecheck çalıştır. Sonuçları execution.log'a `meta.quality` alanıyla yaz. Mevcut Quality Gates görünümü bu veriyi zaten tüketiyor.
-AC: `claudedash init` ile oluşan şablonda PostToolUse hook örneği var. Quality Gates panelinde lint/typecheck sonuçları görünür.
-
-## S4-T2
-Area: Core
-Priority: medium
-Depends: S4-T1
-Description: TDD zorlama hook şablonu: yeni Python/TS/Go dosyası yazıldığında karşılık gelen test dosyasının varlığını kontrol et. Yoksa uyarı ver. Test dosyasını bulmak için standart isimlendirme kuralları kullan.
-AC: Şablon dosyası `test_{module}.py`, `{module}.test.ts`, `{module}_test.go` varlığını kontrol eder. Yanlış pozitif için `should_skip()` listesi yapılandırılabilir.
-
-## S4-T3
 Area: Dashboard
 Priority: medium
-Depends: S4-T1
-Description: Quality Gates zaman çizelgesine dosya bazlı filtreleme ekle. Şu anda `?taskId=` parametresi var; buna ek olarak `?file=` parametresi ile belirli bir dosyanın geçmiş kalite sonuçları görüntülenebilmeli.
-AC: `GET /quality-timeline?file=src/core/todoReader.ts` o dosyaya ait tüm quality event'lerini döner. Dashboard'da dosya adına tıklanabilir link ile filtreleme yapılır.
+Depends: S2-T1
+Description: Dashboard sol paneline "Agent Bağlantı Sağlığı" göstergesi ekle: son TodoWrite kaç saniye önce geldi, SSE bağlı mı, kaç aktif session var. Pasif izleme değil, gerçek zamanlı bağlantı kalitesi.
+AC: `/health` endpoint'ine `lastTodoWrite` timestamp ve `connectedClients` alanları eklenir. Dashboard'da yeşil/sarı/kırmızı nokta gösterir.
 
-# Slice S5 — Workflow ve Bellek
+# Slice S3 — Tarayıcıdan Kuyruk Editörü
+
+## S3-T1
+Area: Server
+Priority: high
+Depends: -
+Description: `PATCH /plan/task/:taskId` endpoint'i ekle. Body: `{ status: 'DONE' | 'BLOCKED', reason?: string }`. `queue.md` dosyasını günceller ve `execution.log`'a yazar. Yalnızca localhost'tan erişilebilir (mevcut CORS politikası yeterli).
+AC: `curl -X PATCH http://localhost:3141/plan/task/S1-T1 -d '{"status":"DONE"}'` queue.md'deki task'ı günceller. SSE ile diğer istemcilere yayınlanır.
+
+## S3-T2
+Area: Dashboard
+Priority: high
+Depends: S3-T1
+Description: Plan Mode panelinde her task kartına "Tamamla" / "Bloke Et" butonları ekle. Tıklanınca `PATCH /plan/task/:taskId` çağrısı yapar ve optimistic UI günceller. Geri al (undo) 5 sn toast ile sunulur.
+AC: Dashboard'dan task durumunu değiştirmek queue.md'yi günceller. SSE aracılığıyla sayfa otomatik yenilenir. Undo butonu 5 sn içinde önceki duruma döner.
+
+## S3-T3
+Area: Dashboard
+Priority: medium
+Depends: S3-T2
+Description: Plan Mode'da "Yeni Görev Ekle" formu. Kısa başlık + öncelik (critical/high/medium/low) + bağımlılık alanları. `POST /plan/task` endpoint ile queue.md'ye yeni blok append eder.
+AC: Dashboard'dan eklenen görev queue.md'de doğru formatta görünür. Zorunlu alan (başlık) boş geçilemez; client-side validasyon.
+
+# Slice S4 — Auth & Takım Paylaşımı
+
+## S4-T1
+Area: CLI
+Priority: high
+Depends: -
+Description: `claudedash start --token <secret>` seçeneği. Token varsa tüm API endpoint'leri `Authorization: Bearer <token>` header kontrolü yapar. Token yoksa (varsayılan) mevcut davranış devam eder. Token CLI'a verilmezse `CLAUDEDASH_TOKEN` env var'ından okunur.
+AC: Token ile başlatılan server'a token'sız GET isteği 401 döner. Doğru token ile 200 döner. Dashboard URL'e `?token=<secret>` eklenerek açılabilir.
+
+## S4-T2
+Area: Docs
+Priority: medium
+Depends: S4-T1
+Description: README'ye "Takımla Paylaşım" bölümü ekle. `--token` kullanım örneği, güvenlik uyarısı (token'ı git'e commit etme), `.env` ile kullanım, local tunnel (ngrok/cloudflared) önerisi.
+AC: README'de "Sharing with your team" H2 başlığı altında en az 3 kod örneği var.
+
+# Slice S5 — Landing & README Yenileme
 
 ## S5-T1
-Area: CLI
-Priority: medium
+Area: Docs
+Priority: high
 Depends: -
-Description: `/spec` komutu ekle. Üç fazlı yapılandırılmış geliştirme akışı: spec-plan (keşif ve onay), spec-implement (TDD ile kod yazımı), spec-verify (test + bağımsız inceleme). Her faz execution.log'a DONE/FAILED kaydeder.
-AC: `claudedash init --spec` ile spec modu şablonları oluşturulur. CLAUDE.md snippet'i /spec komutunu tanımlar. Faz geçişleri dashboard'da görünür.
+Description: Landing sayfasına Worktrees özellik kartı ekle (mevcut 4 kart yanına 5. olarak). İçerik: "Paralel Worktree İzleme — Birden fazla git worktree'de çalışan agentları tek ekranda görün." Ayrıca sayfanın footer'ına "Not affiliated with Anthropic" disclaimeri ekle.
+AC: `landing/index.html`'de Worktrees feature kartı var. Footer'da disclaimer metni görünüyor. `npm run build` geçiyor.
 
 ## S5-T2
-Area: Core
-Priority: low
+Area: Docs
+Priority: high
 Depends: -
-Description: Çok worktree'li paralel ajan çalıştırmaları için worktree izolasyon şablonu. `claudedash worktree create <branch>` ile yeni izole bir çalışma ortamı oluştur, mevcut Worktrees sekmesinde göster.
-AC: `claudedash worktree create feature/xyz` komutu yeni git worktree açar ve dashboard Worktrees sekmesinde o branch'e ait oturumlar listelenir.
+Description: README.md'yi güncelle: (1) Test sayısını doğru yaz (mevcut `npx vitest run` çıktısıyla eşleştir), (2) CLI komutları tablosuna `recover`, `spec`, `worktree` ekle, (3) API endpoint tablosuna `/claude-insights` ve `?file=` parametresini ekle, (4) "Why claudedash?" bölümüne "Görev başarısız olduğunda bildirim al" maddesini ekle.
+AC: `grep "recover\|spec\|worktree" README.md` sonuç verir. API tablosunda `/claude-insights` satırı var.
+
+## S5-T3
+Area: Docs
+Priority: medium
+Depends: S5-T1
+Description: Landing sayfasına gerçek ekran görüntüsü veya animasyonlu GIF placeholder'ı ekle. Şu an `assets/screenshot-1.png` yolu var ama dosya yok. En azından `assets/` dizini oluştur ve placeholder SVG koy; kayıp dosya nedeniyle broken image gösterilmesin.
+AC: `assets/screenshot-1.png` veya `assets/screenshot-1.svg` mevcut. Landing'de broken image icon görünmüyor.
+
+# Slice S6 — Uyumluluk & Araçlar
+
+## S6-T1
+Area: Tooling
+Priority: medium
+Depends: -
+Description: `THIRD_PARTY_NOTICES` dosyası oluştur. `npm ls --json` çıktısından prod bağımlılıkları listele, her paketin lisansını ekle. `claudedash doctor` CLI komutu ekle: Node.js versiyonu, git varlığı, port erişilebilirliği, CLAUDE.md varlığı, `~/.claude/` dizini erişimi kontrol eder.
+AC: Repo kökünde `THIRD_PARTY_NOTICES` dosyası var (en az 10 bağımlılık). `claudedash doctor` komutu tüm kontrolleri ✓/✗ ile raporlar.
+
+## S6-T2
+Area: Tooling
+Priority: medium
+Depends: -
+Description: GitHub Actions workflow'unda action SHA pinleme. Mevcut `actions/checkout@v4` gibi tag kullanımlarını commit SHA ile değiştir (örn. `actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683`). Ayrıca model-aware context health: `/sessions` response'una `modelContextLimit` alanı ekle. Varsayılan 200k; `?model=claude-haiku` sorgusuyla 100k olarak hesaplansın.
+AC: `.github/workflows/ci.yml`'de SHA pinli action referansları var. `GET /sessions?model=claude-haiku` ile dönen sessions'da contextHealth.limit 100000 oluyor.
