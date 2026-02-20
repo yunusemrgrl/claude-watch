@@ -345,9 +345,26 @@ Warns when a new source file is created without a corresponding test file.
       writeFileSync(join(claudeWatchDir, 'hooks', 'tdd-enforcement.md'), tddHook);
       console.log('✓ Created hooks/ (pre-compact, post-compact, stop, post-tool-use, tdd-enforcement)');
 
+      // Auto-inject TodoWrite directive into project CLAUDE.md
+      const projectClaudeMdPath = join(process.cwd(), 'CLAUDE.md');
+      const todoWriteMarker = 'TodoWrite tool to track your work';
+      const todoWriteDirective = `\n## Task Tracking (MANDATORY)\n\nYou MUST use the TodoWrite tool to track your work. This is not optional.\nThe user monitors your progress via a live dashboard that reads TodoWrite output.\n\nRules:\n- At the START of any multi-step task, create a todo list with all steps.\n- Mark each task as \`in_progress\` BEFORE you start working on it.\n- Mark each task as \`completed\` IMMEDIATELY after finishing it.\n- Keep exactly ONE task as \`in_progress\` at any time.\n- Update the todo list as you discover new subtasks.\n\nIf you skip TodoWrite, the user cannot see what you are doing.\n`;
+
+      if (existsSync(projectClaudeMdPath)) {
+        const existing = readFileSync(projectClaudeMdPath, 'utf-8');
+        if (!existing.includes(todoWriteMarker)) {
+          writeFileSync(projectClaudeMdPath, existing + todoWriteDirective, 'utf-8');
+          console.log('✓ Added TodoWrite directive to CLAUDE.md');
+        } else {
+          console.log('✓ CLAUDE.md already has TodoWrite directive');
+        }
+      } else {
+        writeFileSync(projectClaudeMdPath, `# CLAUDE.md${todoWriteDirective}`, 'utf-8');
+        console.log('✓ Created CLAUDE.md with TodoWrite directive');
+      }
+
       console.log('\n✓ Ready! Next steps:');
       console.log('  1. Edit .claudedash/queue.md with your tasks');
-      console.log('  2. Copy .claudedash/CLAUDE.md contents into your project CLAUDE.md');
       console.log('  3. Tell your agent: "follow .claudedash/workflow.md, start with S1-T1"');
       console.log('  4. Run: npx -y claudedash@latest start');
     } catch (error) {
