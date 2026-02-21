@@ -5,13 +5,17 @@ eksiklerini ve önerilerini belgeler. Her geliştirme sonrası agent deneyimi bu
 
 ---
 
-## Mevcut Durum (v0.7.0)
+## Mevcut Durum (v0.8.0)
 
 ### Ne iyi çalışıyor
 - `npx claudedash start` ile sıfır kurulum, anında başlatma
 - SSE ile gerçek zamanlı todo güncellemeleri — agent çalışırken dashboard canlı güncelleniyor
 - Plan modu (queue.md + execution.log) — otonom workflow için temiz protokol
 - `/health` endpoint — agent kendi durumunu sorgulayabiliyor
+- `/facets` — AI session kalite analizi (outcome, friction, helpfulness)
+- `/conversations` — JSONL tool analytics
+- `/cost` — tahmini API maliyeti
+- Activity view'da Session Quality + Tool Analytics + Cost sekmeler (v0.8.0)
 
 ### Agent Perspektifinden Eksikler
 
@@ -119,4 +123,89 @@ Bu hook, her tool kullanımında dashboard'a bildirir → gerçek zamanlı tool 
 
 ---
 
-_Son güncelleme: 2026-02-21 — v0.7.0_
+## Derinlemesine Rakip Araştırması Bulguları (2026-02-21)
+
+Araştırılan repolar: ccusage, claudecodeui, claude-code-hooks-multi-agent-observability,
+ClaudeWatch, claude-pilot
+
+### ccusage'dan kritik öğrenimler
+
+**5 Saatlik Billing Block:**
+Claude Code, 5 saatlik rolling window ile faturalandırıyor. ccusage bu bloğu takip eder:
+- Aktif block'un elapsed time'ı, kalan token/süre
+- Burn rate: token/dakika + $/saat
+- Block sonu tahmini maliyet
+
+JSONL dosyalarında `message.usage` alanı (`inputTokens`, `outputTokens`,
+`cacheCreationInputTokens`, `cacheReadInputTokens`, `costUSD`) var.
+Bu alanları parse ederek gerçek zamanlı billing block widget yapılabilir.
+
+**Statusline hook:**
+ccusage'ın statusline komutu şu veriyi bir hook JSON'ından okuyor:
+- `cost.total_cost_usd`, `cost.total_duration_ms`
+- `cost.total_lines_added/removed`
+- `context_window.total_input_tokens`, `context_window.context_window_size`
+Bu veri Claude Code tarafından hook çalıştığında env var olarak sağlanıyor.
+
+**Cache efficiency metric:**
+`cacheReadInputTokens / totalInputTokens` oranı — yüksek oran context'in verimli
+kullanıldığını gösteriyor. Dashboard'da bir "cache hit rate" gauge mantıklı.
+
+### claudecodeui'dan kritik öğrenimler
+
+Her JSONL mesajında `gitBranch` alanı var → hangi branch'te çalışıldığı biliniyor.
+`isSidechain: true` → sub-agent (Task tool ile başlatılmış) konuşmalar.
+
+Conversation browser için message content types:
+- `text` — düz metin
+- `tool_use` — `{ name, input }` — tam argümanlarla
+- `tool_result` — `{ tool_use_id, content, is_error }` — ham çıktı
+- `thinking` — extended thinking blokları (etkinleştirilince)
+
+### claude-pilot'tan kritik öğrenimler
+
+**Pre/post-compaction state capture:**
+`PreCompact` hook'u tetiklendiğinde aktif task listesi, plan ve mevcut görev
+kaydedilmeli. Sonra `PostCompact` hook'u bu durumu restore etmeli.
+claudedash şu an context compaction'da task listesi kaybını izlemiyor.
+
+**`~/.claude/plans/*.md` dosyaları:**
+4 adet plan dosyası mevcut. Her biri: başlık, context, değişiklik listesi,
+doğrulama adımları. Plans Library sekmesi ile bunlar gösterilebilir.
+
+**Threshold-based context uyarıları:**
+40% → save, 55% → summarize, 65% → warning, 75% → auto-compact.
+claudedash'in mevcut ContextHealth sistemi sadece warn/critical yapıyor;
+daha granüler threshold'lar eklenebilir.
+
+### Keşfedilmemiş `~/.claude` verileri (öncelik sırasıyla)
+
+| Kaynak | İçerik | claudedash'te Önerilen Widget |
+|--------|---------|-------------------------------|
+| `history.jsonl` | Her promptun tam metni + proje + zaman | Aranabilir prompt geçmişi, top projeler |
+| `session-meta/` (yeni alanlar) | `user_interruptions`, `user_response_times`, `files_modified`, `lines_removed` | Engagement score, velocity metric |
+| `plans/*.md` | Claude tarafından yazılan plan belgeleri | Plans Library sekmesi |
+| `tasks/{id}/N.json` | `blocks`/`blockedBy` dependency graph | Task bağımlılık görselleştirmesi |
+| JSONL `message.usage` | Token/cost per message | 5h billing block widget |
+| JSONL `gitBranch` | Branch başına aktivite | Branch bazlı iş özeti |
+
+### Agent için Hook Mimarisi (Yüksek Öncelik)
+
+Tüm rakipler polling yapıyor — gerçek zamanlı tool call görünürlüğü yok.
+Hook tabanlı push mimarisi ile claudedash <1sn latency yakalayabilir:
+
+```
+~/.claude/settings.json → hooks →
+  PostToolUse: curl POST http://localhost:4317/hook
+  PreCompact: curl POST http://localhost:4317/hook
+  SessionEnd: curl POST http://localhost:4317/hook
+```
+
+Hook payload: `{ event, tool_name, session_id, timestamp, cwd }`
+→ Server SSE'den push eder → dashboard tool call timeline render eder
+
+Bu, rakiplerden gerçek anlamda farklılaştıran özellik olur.
+
+---
+
+_Son güncelleme: 2026-02-21 — v0.8.0_
