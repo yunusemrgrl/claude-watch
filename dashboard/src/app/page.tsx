@@ -12,6 +12,7 @@ import {
   PanelLeftClose,
   BarChart2,
   FileText,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 import type { HealthResponse, UsageStats } from "@/types";
@@ -22,10 +23,11 @@ import { PlanView } from "@/views/PlanView";
 import { InsightsView } from "@/views/InsightsView";
 import { ActivityView } from "@/views/ActivityView";
 import { PlansLibraryView } from "@/views/PlansLibraryView";
+import { ClaudeMdView } from "@/views/ClaudeMdView";
 import { useNotifications } from "@/hooks/useNotifications";
 import { Tooltip } from "@/components/ui/tooltip";
 
-type ViewMode = "live" | "plan" | "worktrees" | "activity" | "insights" | "plans";
+type ViewMode = "live" | "plan" | "worktrees" | "activity" | "insights" | "plans" | "claudemd";
 
 const NAV_TABS: {
   id: Exclude<ViewMode, "insights">;
@@ -68,6 +70,13 @@ const NAV_TABS: {
     label: "Docs",
     tooltip: "Claude Code plan documents from ~/.claude/plans/",
     show: () => true,
+  },
+  {
+    id: "claudemd",
+    icon: Settings,
+    label: "Config",
+    tooltip: "Edit CLAUDE.md agent instruction files",
+    show: (m) => m.plan,
   },
 ];
 
@@ -284,6 +293,8 @@ export default function Dashboard() {
           <ActivityView />
         ) : mode === "plans" ? (
           <PlansLibraryView />
+        ) : mode === "claudemd" ? (
+          <ClaudeMdView />
         ) : (
           <InsightsView />
         )}

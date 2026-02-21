@@ -442,3 +442,15 @@ export interface WorktreeState {
   behindCount: number;
   associatedTasks?: WorktreeAssociatedTask[];
 }
+
+// CLAUDE.md editor types
+export interface ClaudeMdFile {
+  path: string | null;
+  content: string;
+  exists: boolean;
+}
+
+export interface ClaudeMdResponse {
+  plan: ClaudeMdFile;
+  project: ClaudeMdFile;
+}

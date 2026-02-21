@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
-import { existsSync, readFileSync, appendFileSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readFileSync, appendFileSync, writeFileSync } from 'fs';
+import { join, dirname } from 'path';
 import type { EventEmitter } from 'events';
 import { parseQueue, type QueueParseConfig } from '../../core/queueParser.js';
 import { parseLog } from '../../core/logParser.js';
@@ -354,6 +354,48 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
     }));
     return { agents };
   });
+
+  // GET /claudemd — read both CLAUDE.md files (plan dir + project root)
+  fastify.get('/claudemd', async () => {
+    const planMdPath = planDir ? join(planDir, 'CLAUDE.md') : null;
+    const projectMdPath = planDir ? join(dirname(planDir), 'CLAUDE.md') : null;
+
+    return {
+      plan: planMdPath
+        ? { path: planMdPath, content: existsSync(planMdPath) ? readFileSync(planMdPath, 'utf-8') : '', exists: existsSync(planMdPath) }
+        : { path: null, content: '', exists: false },
+      project: projectMdPath
+        ? { path: projectMdPath, content: existsSync(projectMdPath) ? readFileSync(projectMdPath, 'utf-8') : '', exists: existsSync(projectMdPath) }
+        : { path: null, content: '', exists: false },
+    };
+  });
+
+  // PUT /claudemd — save CLAUDE.md content
+  fastify.put<{ Body: { file?: 'plan' | 'project'; content?: string } }>(
+    '/claudemd', async (request, reply) => {
+      if (!planDir) return reply.code(400).send({ error: 'Plan mode not configured' });
+
+      const { file, content } = request.body ?? {};
+      if (file !== 'plan' && file !== 'project') {
+        return reply.code(400).send({ error: 'file must be "plan" or "project"' });
+      }
+      if (typeof content !== 'string') {
+        return reply.code(400).send({ error: 'content must be a string' });
+      }
+
+      const targetPath = file === 'plan'
+        ? join(planDir, 'CLAUDE.md')
+        : join(dirname(planDir), 'CLAUDE.md');
+
+      try {
+        writeFileSync(targetPath, content, 'utf-8');
+      } catch {
+        return reply.code(500).send({ error: `Failed to write ${targetPath}` });
+      }
+
+      return { ok: true, path: targetPath };
+    }
+  );
 
   fastify.get('/claude-insights', async (_request, reply) => {
     const reportPath = join(claudeDir, 'usage-data', 'report.html');
