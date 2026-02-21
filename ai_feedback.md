@@ -208,4 +208,65 @@ Bu, rakiplerden gerçek anlamda farklılaştıran özellik olur.
 
 ---
 
-_Son güncelleme: 2026-02-21 — v0.8.0_
+---
+
+## v1.0.1 Retrospektifi — Agent Perspektifi (2026-02-21)
+
+### Tamamlanan (S7–S10, v0.7.0 → v1.0.1)
+
+✅ `GET /history` — history.jsonl prompt geçmişi
+✅ `GET /plans` — ~/.claude/plans/*.md kütüphanesi (Docs tab)
+✅ `GET /facets` — AI session kalite analizi
+✅ `GET /conversations` — JSONL tool analytics
+✅ `GET /cost` + `GET /billing-block` — maliyet ve 5h rolling window
+✅ `POST /hook` + `GET /hook/events` — hook mimarisi
+✅ `npx claudedash hooks install` — settings.json entegrasyonu
+✅ `POST /log` — HTTP execution log
+✅ `GET /queue` — computed task snapshot
+✅ `POST /agent/register` + heartbeat + `GET /agents` — multi-agent registry
+✅ LiveView Quick Resume panel — son sessionları sidebar'da göster
+✅ Tab rename: Plan→Queue, Plans→Docs
+✅ Notification: task-blocked SSE → browser notification
+
+### Rakip Analizi Sonrası Eksikler (S11 hedefleri)
+
+**Kritik (developer'ı bağımlı yapar):**
+
+1. **MCP Server yok** — ccusage ve claude-pilot her ikisi de MCP expose ediyor. Claude kendi dashboard'unu sorgulayamıyor. `POST /mcp/call { tool: "get_queue" }` → Claude kendi task listesini okuyabilse workflow döngüsü kapanır. Bu en yüksek etkili eksik.
+
+2. **Terminal status komutu yok** — ccusage'ın `ccusage monitor` gibi. `claudedash status` ile tek satır: session sayısı, cost, billing block. Tarayıcı açmadan bilgi almak kritik.
+
+3. **PreCompact hook desteği yok** — planning-with-files ve claude-pilot her ikisi de `/clear` sonrası context recovery yapıyor. Şu an claudedash hooks install sadece PostToolUse + Stop yapıyor.
+
+**Önemli (DX iyileştirir):**
+
+4. **Burn rate / token projeksiyon yok** — ccusage ve Claude-Code-Usage-Monitor her ikisi de "kaç dakika kaldı" hesaplıyor. Bunu LiveView context bar'ına eklemek zor değil.
+
+5. **CLAUDE.md editörü yok** — Her seferinde terminal'de düzenliyoruz. Dashboard'dan bir `PUT /claudemd` endpoint yeterli.
+
+6. **`claudedash doctor` yok** — Yeni kullanıcılar neden çalışmıyor anlamıyor. Tek komutla kurulum kontrolü.
+
+### Gözlemler (mini proje deneyimi)
+
+Bu retroyu yazarken claudedash'i fiilen kullanarak geliştirdim. Gözlemler:
+
+- **Quick Resume çok kullanışlı** — sidebar'da son session'lar görünüyor, hemen `claude resume` yapılabiliyor. Bunu gördükten sonra terminal'e gitme ihtiyacı azaldı.
+- **Queue tab → Kanban daha iyi bir isim olabilirdi** — "Queue" teknik, "Kanban" tanıdık.
+- **Billing block widget aktif olmadığında yok** — Bazen son 5 saatte aktivite yoksa widget kaybolur, neden yokluğunu anlamak zorlaşıyor. "Henüz aktivite yok" placeholder olabilir.
+- **`/history` 50 prompt limiti** — Daha fazla prompt geçmişi istiyorum (100+), en azından arama ile.
+- **Cost breakdown yeterli değil** — Hangi session ne kadar harcadı görmek istiyorum, sadece toplam değil.
+- **MCP eksikliği hissediliyor** — `get_queue` demek yerine dosya okumak zorunda kaldım. MCP olsaydı `claudedash status` terminal komutuna gerek de kalmazdı, Claude direkt sorgulardı.
+
+### Sonuç: Port 4317'yi Vazgeçilmez Yapmak İçin Öncelik Sırası
+
+```
+1. MCP Server      → Claude kendi dashboard'unu okur (feedback loop kapanır)
+2. claudedash status → Terminal'de hızlı kontrol
+3. PreCompact hook → Context recovery otomatikleşir
+4. Burn rate       → "Context dolmadan uyar"
+5. CLAUDE.md editör → Settings döngüsü dashboarddan
+6. Task oluştur UI → Queue'yu terminal'e gitmeden yönet
+7. claudedash doctor → Onboarding sorunu yok
+```
+
+_Son güncelleme: 2026-02-21 — v1.0.1 retrospektifi_

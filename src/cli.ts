@@ -904,4 +904,271 @@ program
     process.exit(1);
   });
 
+// ── mcp command ────────────────────────────────────────────────────────────────
+program
+  .command('mcp')
+  .description('Start claudedash as an MCP server (stdio transport). Add with: claude mcp add claudedash -- npx -y claudedash@latest mcp')
+  .option('--port <port>', 'claudedash server port to proxy', '4317')
+  .action((opts: { port: string }) => {
+    const port = opts.port;
+    const baseUrl = `http://localhost:${port}`;
+
+    async function tryFetch<T>(path: string): Promise<T | null> {
+      try {
+        const res = await fetch(`${baseUrl}${path}`, { signal: AbortSignal.timeout(2000) });
+        return res.ok ? (res.json() as Promise<T>) : null;
+      } catch { return null; }
+    }
+
+    const TOOLS = [
+      {
+        name: 'get_queue',
+        description: 'Get the current task queue snapshot with computed statuses (READY/DONE/FAILED/BLOCKED) and dependency resolution.',
+        inputSchema: { type: 'object', properties: {}, required: [] },
+      },
+      {
+        name: 'get_sessions',
+        description: 'Get currently active Claude Code sessions with their task lists and context health.',
+        inputSchema: { type: 'object', properties: {}, required: [] },
+      },
+      {
+        name: 'get_billing_block',
+        description: 'Get the current 5-hour billing block status, tokens used, and estimated cost.',
+        inputSchema: { type: 'object', properties: {}, required: [] },
+      },
+      {
+        name: 'get_agents',
+        description: 'Get the list of registered agents with their status, current task, and whether they are stale (>60s since last heartbeat).',
+        inputSchema: { type: 'object', properties: {}, required: [] },
+      },
+      {
+        name: 'log_task',
+        description: 'Log a task result to the execution log. Use this after completing, failing, or getting blocked on a task.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            task_id: { type: 'string', description: 'Task ID (e.g. S1-T1)' },
+            status: { type: 'string', enum: ['DONE', 'FAILED', 'BLOCKED'], description: 'Task outcome' },
+            reason: { type: 'string', description: 'Required for BLOCKED status. Explanation of what is blocking.' },
+            agent: { type: 'string', description: 'Agent name (optional)' },
+          },
+          required: ['task_id', 'status'],
+        },
+      },
+    ];
+
+    async function callTool(name: string, args: Record<string, unknown>): Promise<string> {
+      switch (name) {
+        case 'get_queue': {
+          const data = await tryFetch<unknown>('/queue');
+          if (!data) return 'claudedash server not running. Start with: npx claudedash start';
+          return JSON.stringify(data, null, 2);
+        }
+        case 'get_sessions': {
+          const data = await tryFetch<unknown>('/sessions');
+          if (!data) return 'claudedash server not running. Start with: npx claudedash start';
+          return JSON.stringify(data, null, 2);
+        }
+        case 'get_billing_block': {
+          const data = await tryFetch<unknown>('/billing-block');
+          if (!data) return 'claudedash server not running. Start with: npx claudedash start';
+          return JSON.stringify(data, null, 2);
+        }
+        case 'get_agents': {
+          const data = await tryFetch<unknown>('/agents');
+          if (!data) return 'claudedash server not running. Start with: npx claudedash start';
+          return JSON.stringify(data, null, 2);
+        }
+        case 'log_task': {
+          const { task_id, status, reason, agent } = args as { task_id?: string; status?: string; reason?: string; agent?: string };
+          if (!task_id || !status) return 'Error: task_id and status are required';
+          if (status === 'BLOCKED' && !reason) return 'Error: reason is required for BLOCKED status';
+
+          // Try HTTP first
+          const serverData = await tryFetch<{ ok?: boolean }>('/health');
+          if (serverData) {
+            try {
+              const res = await fetch(`${baseUrl}/log`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ task_id, status, reason, agent: agent ?? 'mcp' }),
+                signal: AbortSignal.timeout(2000),
+              });
+              if (res.ok) return `Task ${task_id} logged as ${status} via HTTP`;
+            } catch { /* fall through to file */ }
+          }
+
+          // Fallback: write to file
+          const logPath = join(process.cwd(), '.claudedash', 'execution.log');
+          if (!existsSync(join(process.cwd(), '.claudedash'))) {
+            return 'Error: .claudedash/ not found. Run claudedash init first.';
+          }
+          const entry = JSON.stringify({ task_id, status, timestamp: new Date().toISOString(), agent: agent ?? 'mcp', ...(reason ? { reason } : {}) });
+          const { appendFileSync } = await import('fs');
+          appendFileSync(logPath, entry + '\n', 'utf8');
+          return `Task ${task_id} logged as ${status} to execution.log`;
+        }
+        default:
+          return `Unknown tool: ${name}`;
+      }
+    }
+
+    type JsonRpcRequest = { jsonrpc: string; id: number | string | null; method: string; params?: Record<string, unknown> };
+    type ToolCallParams = { name: string; arguments?: Record<string, unknown> };
+
+    function respond(id: number | string | null, result: unknown) {
+      process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id, result }) + '\n');
+    }
+    function respondError(id: number | string | null, code: number, message: string) {
+      process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id, error: { code, message } }) + '\n');
+    }
+
+    // Read newline-delimited JSON-RPC from stdin
+    let buf = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', (chunk: string) => {
+      buf += chunk;
+      const lines = buf.split('\n');
+      buf = lines.pop() ?? '';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        let req: JsonRpcRequest;
+        try { req = JSON.parse(trimmed) as JsonRpcRequest; }
+        catch { respondError(null, -32700, 'Parse error'); continue; }
+
+        if (req.method === 'initialize') {
+          respond(req.id, {
+            protocolVersion: '2024-11-05',
+            capabilities: { tools: {} },
+            serverInfo: { name: 'claudedash', version: '1.0.1' },
+          });
+        } else if (req.method === 'notifications/initialized') {
+          // no response needed
+        } else if (req.method === 'tools/list') {
+          respond(req.id, { tools: TOOLS });
+        } else if (req.method === 'tools/call') {
+          const params = (req.params ?? {}) as ToolCallParams;
+          void callTool(params.name ?? '', params.arguments ?? {}).then((text) => {
+            respond(req.id, { content: [{ type: 'text', text }] });
+          });
+        } else {
+          respondError(req.id, -32601, `Method not found: ${req.method}`);
+        }
+      }
+    });
+
+    process.stdin.on('end', () => process.exit(0));
+    // Keep process alive
+    process.stdin.resume();
+  });
+
+// ── status command ─────────────────────────────────────────────────────────────
+program
+  .command('status')
+  .description('Show a one-line dashboard status summary (sessions, tasks, cost, billing block)')
+  .option('--port <port>', 'claudedash server port', '4317')
+  .option('--json', 'output machine-readable JSON')
+  .action(async (opts: { port: string; json?: boolean }) => {
+    const port = opts.port;
+    const baseUrl = `http://localhost:${port}`;
+    const claudeDir = join(process.env.HOME ?? '~', '.claude');
+
+    interface SessionsData { sessions?: Array<{ tasks?: Array<{ status: string }> }> }
+    interface BillingData { active?: boolean; minutesRemaining?: number; estimatedCostUSD?: number }
+    interface QueueData { summary?: { blocked?: number; ready?: number } }
+
+    async function tryFetch<T>(url: string): Promise<T | null> {
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(1500) });
+        if (!res.ok) return null;
+        return res.json() as Promise<T>;
+      } catch { return null; }
+    }
+
+    // Try server first
+    const health = await tryFetch<{ status: string }>(`${baseUrl}/health`);
+    const serverOnline = health?.status === 'ok';
+
+    let sessionCount = 0;
+    let inProgressCount = 0;
+    let blockedCount = 0;
+    let estimatedCostUSD: number | null = null;
+    let blockMinutesRemaining: number | null = null;
+
+    if (serverOnline) {
+      const [sessionsData, billingData, queueData] = await Promise.all([
+        tryFetch<SessionsData>(`${baseUrl}/sessions`),
+        tryFetch<BillingData>(`${baseUrl}/billing-block`),
+        tryFetch<QueueData>(`${baseUrl}/queue`),
+      ]);
+
+      sessionCount = sessionsData?.sessions?.length ?? 0;
+      inProgressCount = sessionsData?.sessions?.flatMap((s) => s.tasks ?? [])
+        .filter((t) => t.status === 'in_progress').length ?? 0;
+      blockedCount = queueData?.summary?.blocked ?? 0;
+      if (billingData?.active) {
+        blockMinutesRemaining = billingData.minutesRemaining ?? null;
+        estimatedCostUSD = billingData.estimatedCostUSD ?? null;
+      }
+    } else {
+      // Fallback: read directly from files
+      const todosDir = join(claudeDir, 'todos');
+      if (existsSync(todosDir)) {
+        const files = readdirSync(todosDir).filter((f) => f.endsWith('.jsonl'));
+        const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+        for (const file of files) {
+          const path = join(todosDir, file);
+          const mtime = statSync(path).mtimeMs;
+          if (mtime < fiveMinAgo) continue;
+          sessionCount++;
+          try {
+            const lines = readFileSync(path, 'utf8').trim().split('\n').filter(Boolean);
+            const last = lines.length ? JSON.parse(lines[lines.length - 1]) : null;
+            const tasks: Array<{ status: string }> = last?.tasks ?? [];
+            inProgressCount += tasks.filter((t) => t.status === 'in_progress').length;
+          } catch { /* skip */ }
+        }
+      }
+      // Count BLOCKED from execution.log
+      const logPath = join(process.cwd(), '.claudedash', 'execution.log');
+      if (existsSync(logPath)) {
+        const lines = readFileSync(logPath, 'utf8').trim().split('\n').filter(Boolean);
+        const taskStatus = new Map<string, string>();
+        for (const line of lines) {
+          try {
+            const e = JSON.parse(line) as { task_id?: string; status?: string };
+            if (e.task_id && e.status) taskStatus.set(e.task_id, e.status);
+          } catch { /* skip */ }
+        }
+        blockedCount = [...taskStatus.values()].filter((s) => s === 'BLOCKED').length;
+      }
+    }
+
+    if (opts.json) {
+      console.log(JSON.stringify({ serverOnline, sessionCount, inProgressCount, blockedCount, estimatedCostUSD, blockMinutesRemaining }));
+      return;
+    }
+
+    // Build one-line output
+    const dim = '\x1b[2m'; const reset = '\x1b[0m';
+    const green = '\x1b[32m'; const yellow = '\x1b[33m'; const red = '\x1b[31m'; const cyan = '\x1b[36m';
+
+    const dot = serverOnline ? `${green}●${reset}` : `${dim}○${reset}`;
+    const parts: string[] = [];
+
+    parts.push(`${sessionCount} session${sessionCount !== 1 ? 's' : ''}`);
+    if (inProgressCount > 0) parts.push(`${cyan}${inProgressCount} active${reset}`);
+    if (blockedCount > 0) parts.push(`${red}${blockedCount} BLOCKED${reset}`);
+    if (estimatedCostUSD !== null) parts.push(`${yellow}$${estimatedCostUSD.toFixed(2)} today${reset}`);
+    if (blockMinutesRemaining !== null) {
+      const h = Math.floor(blockMinutesRemaining / 60);
+      const m = blockMinutesRemaining % 60;
+      parts.push(`${dim}block ${h > 0 ? `${h}h` : ''}${m}m left${reset}`);
+    }
+    if (!serverOnline) parts.push(`${dim}server offline — run 'claudedash start'${reset}`);
+
+    console.log(`${dot} ${parts.join(` ${dim}·${reset} `)}`);
+  });
+
 program.parse();

@@ -1,36 +1,66 @@
-# Slice S10 — Agent API (ai_feedback.md eksikler)
+# Slice S11 — "Indispensable" Milestone
 
-## S10-T1
+## S11-T1
+Area: CLI
+Priority: critical
+Depends: -
+Description: `npx claudedash status` komutu ekle. Terminal'de tek satırlık durum çıktısı: aktif session sayısı, toplam in_progress task, bugünkü maliyet tahmini, billing block kalan süresi (varsa), BLOCKED task varsa kırmızı uyarı. Örnek çıktı: `● 2 sessions · 3 tasks active · $0.84 today · block 2h14m left`. JSON flag ile `--json` çıktısı da desteklensin. Bu ccusage'ın terminal status line'ına karşılık gelen claudedash cevabı.
+AC: `npx claudedash status` → tek satır terminal çıktısı, tüm bilgiler doğru. `--json` → machine-readable. No server required (doğrudan dosya okur).
+
+## S11-T2
 Area: Server
 Priority: critical
 Depends: -
-Description: `POST /log` endpoint ekle. Agent HTTP üzerinden execution.log'a entry yazabilsin. Body: `{ task_id: string, status: "DONE"|"FAILED"|"BLOCKED", agent?: string, reason?: string, meta?: object }`. Endpoint, `.claudedash/execution.log` dosyasına JSONL formatında append eder (timestamp otomatik). agentScopeDir yoksa 404 dön. BLOCKED status gelirse SSE üzerinden `{ type: "blocked", task_id, reason }` event'i push et.
-AC: `curl -X POST http://localhost:4317/log -d '{"task_id":"S1-T1","status":"DONE","agent":"test"}'` → 200 + execution.log'a satır eklendi. BLOCKED gönderince SSE client'lar event alıyor.
+Description: claudedash'i MCP (Model Context Protocol) server olarak expose et. `claudedash mcp` komutu veya `GET /mcp/tools` + `POST /mcp/call` endpoints. Araçlar: `get_queue` (queue snapshot), `get_agents` (agent listesi), `get_sessions` (aktif session'lar), `get_cost` (bugünkü maliyet), `get_billing_block` (block durumu), `log_task` (execution.log'a yaz). MCP JSON-RPC 2.0 formatı. Böylece Claude kendi dashboard'unu sorgulayabilir: "queue'da kaç READY task var?"
+AC: Claude Code'da `add_mcp_server claudedash http://localhost:4317/mcp` → araçlar görünüyor. `get_queue` çalışıyor. Claude kendi dashboard'unu sorgulayabiliyor.
 
-## S10-T2
-Area: Server
-Priority: critical
-Depends: -
-Description: `GET /queue` endpoint ekle. queue.md + execution.log dosyalarını parse et. queue.md'deki her task için: id, area, description (ilk 200 karakter), dependsOn (Depends: satırından). execution.log'dan son status'u al. Her task'ın computed status'unu hesapla: log'da DONE ise DONE, FAILED ise FAILED, BLOCKED ise BLOCKED; dependency'leri DONE değilse BLOCKED; hiçbiri yoksa READY. Döndür: `{ tasks: ComputedTask[], summary: { total, done, failed, blocked, ready } }`.
-AC: `curl http://localhost:4317/queue` → task listesi + summary. Her task'ta status alanı doğru hesaplanmış. Dependency chain çalışıyor.
-
-## S10-T3
-Area: Server
+## S11-T3
+Area: CLI+Server
 Priority: high
 Depends: -
-Description: `POST /agent/register` ve `POST /agent/heartbeat` endpoint'leri ekle. Register body: `{ agentId: string, sessionId?: string, taskId?: string, name?: string }`. Heartbeat body: `{ agentId: string, status?: string, taskId?: string }`. Server memory'de aktif agent'ları tut (Map). Son heartbeat'ten 60 saniye geçmişse agent "stale" sayılsın. `GET /agents` endpoint: kayıtlı agent'ların listesini döndür (agentId, name, taskId, status, lastSeen, isStale). SSE'den `{ type: "agent-update" }` push et.
-AC: register + heartbeat → 200. GET /agents → aktif agent listesi. 60s timeout ile stale detection çalışıyor.
+Description: PreCompact + PostCompact hook desteği. `claudedash hooks install --all` ile 4 hook: PostToolUse, Stop (mevcut) + PreCompact, PostCompact. PreCompact hook'u: mevcut plan durumunu (hangi task in_progress, kaçı DONE) `.claudedash/compact-state.json`'a yaz. PostCompact hook'u: compact-state.json varsa, agent CLAUDE.md'de "compact sonrası oku" talimatı eklensin. Dashboard'da "Last compaction: 2m ago, state saved" göster. Bu planning-with-files'ın context persistence pattern'ı ama otomatik.
+AC: `claudedash hooks install --all` → 4 hook kurulu. PreCompact tetiklenince compact-state.json oluşuyor. Dashboard'da compaction eventi görünüyor.
 
-## S10-T4
+## S11-T4
 Area: Dashboard
 Priority: high
-Depends: S10-T2, S10-T3
-Description: LiveView sidebar'a "Agent API" durum göstergesi ekle. Sidebar footer'ına küçük bir panel: (1) /queue summary badge'leri: `4 READY · 2 DONE · 1 BLOCKED`. BLOCKED varsa kırmızı vurgulu. (2) Kayıtlı agent'lar: her biri için isim + taskId + son görülme. Stale agent'lar soluk gösterilir. (3) BLOCKED SSE event gelince browser notification tetikle ("Task BLOCKED: <task_id> — <reason>"). Bu mevcut notification sistemini genişletir.
-AC: LiveView sidebar'da queue summary görünüyor. BLOCKED bildirim çalışıyor. Agent listesi var.
+Depends: -
+Description: LiveView'a token burn rate widget ekle. Son 10 dakikadaki token kullanımını (SSE session event'lerinden) takip et, tokens/dakika hesapla. Her aktif session için "context dolana kadar ~Xdk" tahmini göster. Billing block'ta "blok bitene kadar ~Xdk, tahmini son maliyet $Y" göster. Basit lineer projeksiyon yeterli. Sidebar'da mevcut context health yüzdesinin yanına ekle.
+AC: Aktif session varken sidebar'da burn rate + tahmini süre görünüyor. Billing block varsa ek projeksiyon. Gerçekçi rakamlar (tokens/min).
 
-## S10-T5
-Area: Server+CLI
+## S11-T5
+Area: Dashboard
 Priority: medium
 Depends: -
-Description: `npx claudedash init` komutuna `workflow.md` şablonu ekle. Mevcut init komutu .claudedash/queue.md + CLAUDE.md oluşturuyor. Buna ek olarak `.claudedash/workflow.md` oluştur. Şablon: INTAKE (queue'dan task al), EXECUTE (işi yap), LOG (execution.log'a yaz VEYA POST /log endpoint'e), CHECKPOINT (blocker varsa BLOCKED logla ve dur) fazları. Log için tercih sırası: server çalışıyorsa HTTP, değilse dosya. Ayrıca workflow.md'de `POST /log` kullanım örneği göster.
-AC: `npx claudedash init` → .claudedash/workflow.md oluşturuyor. workflow.md'de POST /log kullanım örneği var. CLAUDE.md snippet'ı workflow.md'yi referans ediyor.
+Description: CLAUDE.md editörü ekle (yeni tab veya Settings modal). Mevcut proje CLAUDE.md dosyasını göster ve düzenlenebilir yap. `GET /claudemd` endpoint: `.claudedash/CLAUDE.md` + proje root'undaki `CLAUDE.md` dosyalarını döndür. `PUT /claudemd` endpoint: içeriği kaydet. Dashboard'da Monaco veya basit textarea ile editör. Kaydet butonuyla anlık güncelleme. Çünkü CLAUDE.md'yi her seferinde terminal'de düzenlemek zahmetli.
+AC: Dashboard'da CLAUDE.md tab/modal'ı var. Düzenleme yapılıp kaydedilince dosya güncelleniyor. Her iki CLAUDE.md (proje root + .claudedash/) gösteriliyor.
+
+## S11-T6
+Area: Server
+Priority: medium
+Depends: -
+Description: `GET /sessions/:sessionId/context` endpoint ekle. Belirli bir session'ın JSONL dosyasını okur, son N mesajı özetler: toplam mesaj, tool call'lar, son kullanıcı promptu, son asistan çıktısı (ilk 500 karakter). Bu sayede agent "bu session'da ne vardı?" diye sorabilir. Ayrıca `GET /sessions/:sessionId/tools` → bu session'da kullanılan araçlar + sayıları. MCP'nin `get_sessions` aracına entegre edilir.
+AC: `GET /sessions/abc123/context` → session özeti JSON. Tool counts doğru. Büyük JSONL dosyalarında timeout yok (streaming veya limit ile).
+
+# Slice S12 — Developer Experience Polish
+
+## S12-T1
+Area: Dashboard
+Priority: high
+Depends: -
+Description: Global keyboard shortcut sistemi ekle. `?` tuşuna basınca shortcut cheatsheet göster. Shortcutlar: `L` → Live view, `Q` → Queue view, `A` → Activity, `D` → Docs, `R` → son session resume, `/` → search focus, `Escape` → search temizle, `Ctrl+K` → command palette (session seç). Bu developer'lar için terminal-like hissettirmek için kritik.
+AC: `?` cheatsheet açılıyor. Tüm shortcutlar çalışıyor. Command palette ile session seçimi var.
+
+## S12-T2
+Area: Dashboard+Server
+Priority: high
+Depends: -
+Description: Hızlı "Task Oluştur" UI'ı ekle. Queue tab'ında "+" butonu → modal: slice seç (mevcut slice'lardan), task description yaz, area seç, depends seç (mevcut task'lardan dropdown). Submit → `PUT /queue` endpoint queue.md'ye yeni task ekler (doğru formatta). Bu çok önemli: şu an queue.md'yi el ile düzenlemek gerekiyor. Dashboard'dan task oluşturabilmek developer flow'unu kırmıyor.
+AC: Dashboard'dan task oluşturulabiliyor. queue.md'ye doğru format ile ekleniyor. Mevcut task listesi güncelleniyor.
+
+## S12-T3
+Area: CLI
+Priority: medium
+Depends: -
+Description: `claudedash doctor` komutu. Kullanıcının kurulumunu kontrol eder: ~/.claude/ var mı? queue.md var mı? execution.log var mı? hooks kurulu mu? Port 4317 açık mı? Server versiyonu npm'deki latest ile eşleşiyor mu? Her kontrol için ✓ / ✗ + tavsiye. Bu "neden çalışmıyor?" sorusunu ortadan kaldırır.
+AC: `claudedash doctor` → her kontrol için sonuç. Eksik hook varsa `claudedash hooks install` önerisi. Port çakışması varsa alternatif port önerisi.
