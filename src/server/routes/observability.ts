@@ -99,12 +99,17 @@ export async function observabilityRoutes(fastify: FastifyInstance, opts: Observ
   });
 
   // GET /history — reads ~/.claude/history.jsonl (full cross-project prompt history)
-  fastify.get('/history', async (_req, reply) => {
+  fastify.get<{ Querystring: { limit?: string; offset?: string } }>('/history', async (_req, reply) => {
     const historyPath = join(claudeDir, 'history.jsonl');
     if (!existsSync(historyPath)) {
       return { prompts: [], topProjects: [] };
     }
     try {
+      const limitParam = _req.query.limit ? parseInt(_req.query.limit, 10) : 50;
+      const offsetParam = _req.query.offset ? parseInt(_req.query.offset, 10) : 0;
+      const limit = Math.min(isNaN(limitParam) ? 50 : limitParam, 500);
+      const offset = isNaN(offsetParam) ? 0 : Math.max(0, offsetParam);
+
       const raw = readFileSync(historyPath, 'utf8');
       const lines = raw.split('\n').filter(l => l.trim());
 
@@ -133,9 +138,9 @@ export async function observabilityRoutes(fastify: FastifyInstance, opts: Observ
         } catch { /* skip bad lines */ }
       }
 
-      // Sort by timestamp desc, return last 50
+      // Sort by timestamp desc, paginate
       allEntries.sort((a, b) => b.timestamp - a.timestamp);
-      const prompts = allEntries.slice(0, 50).map(e => ({
+      const prompts = allEntries.slice(offset, offset + limit).map(e => ({
         display: e.display,
         timestamp: new Date(e.timestamp).toISOString(),
         project: e.project,
@@ -149,7 +154,7 @@ export async function observabilityRoutes(fastify: FastifyInstance, opts: Observ
         .slice(0, 10)
         .map(([path, count]) => ({ path, name: basename(path), count }));
 
-      return { prompts, topProjects, total: allEntries.length };
+      return { prompts, topProjects, total: allEntries.length, offset, limit };
     } catch {
       return reply.code(500).send({ error: 'Failed to read history.jsonl' });
     }
@@ -485,9 +490,20 @@ export async function observabilityRoutes(fastify: FastifyInstance, opts: Observ
       const windowMs = 5 * 60 * 60 * 1000; // 5 hours
       const now = Date.now();
       const windowStart = now - windowMs;
+      // Scan up to 10h back to find last block info when current window is idle
+      const lookbackStart = now - 2 * windowMs;
 
-      let totalInput = 0, totalOutput = 0, totalCacheCreate = 0, totalCacheRead = 0;
-      let oldestTimestamp: number | null = null;
+      const SONNET_IN = 3, SONNET_OUT = 15; // per MTok (assume sonnet as baseline)
+      const calcCost = (inp: number, out: number, cacheR: number, cacheC: number) =>
+        Math.round(((inp / 1_000_000) * SONNET_IN + (out / 1_000_000) * SONNET_OUT +
+          (cacheR / 1_000_000) * (SONNET_IN * 0.1) + (cacheC / 1_000_000) * (SONNET_IN * 0.25)) * 100) / 100;
+
+      // Current window accumulators
+      let cur_in = 0, cur_out = 0, cur_cC = 0, cur_cR = 0;
+      let curOldest: number | null = null;
+      // Last (previous) block accumulators
+      let prev_in = 0, prev_out = 0, prev_cC = 0, prev_cR = 0;
+      let prevOldest: number | null = null, prevNewest: number | null = null;
 
       const projectDirs = readdirSync(projectsDir);
       for (const pd of projectDirs) {
@@ -505,38 +521,51 @@ export async function observabilityRoutes(fastify: FastifyInstance, opts: Observ
                 const msg = JSON.parse(line) as Record<string, unknown>;
                 if (msg.type !== 'assistant') continue;
                 const ts = typeof msg.timestamp === 'string' ? new Date(msg.timestamp).getTime() : 0;
-                if (!ts || ts < windowStart) continue;
+                if (!ts || ts < lookbackStart) continue;
 
                 const message = msg.message as Record<string, unknown> | undefined;
                 const usage = message?.usage as Record<string, number> | undefined;
                 if (!usage) continue;
 
-                totalInput += usage.inputTokens ?? 0;
-                totalOutput += usage.outputTokens ?? 0;
-                totalCacheCreate += usage.cacheCreationInputTokens ?? 0;
-                totalCacheRead += usage.cacheReadInputTokens ?? 0;
-                if (!oldestTimestamp || ts < oldestTimestamp) oldestTimestamp = ts;
+                const inp = usage.inputTokens ?? 0;
+                const out = usage.outputTokens ?? 0;
+                const cC = usage.cacheCreationInputTokens ?? 0;
+                const cR = usage.cacheReadInputTokens ?? 0;
+
+                if (ts >= windowStart) {
+                  // Current 5h window
+                  cur_in += inp; cur_out += out; cur_cC += cC; cur_cR += cR;
+                  if (!curOldest || ts < curOldest) curOldest = ts;
+                } else {
+                  // Previous window (5-10h ago)
+                  prev_in += inp; prev_out += out; prev_cC += cC; prev_cR += cR;
+                  if (!prevOldest || ts < prevOldest) prevOldest = ts;
+                  if (!prevNewest || ts > prevNewest) prevNewest = ts;
+                }
               } catch { /* skip */ }
             }
           } catch { /* skip */ }
         }
       }
 
-      const tokensUsed = totalInput + totalOutput + totalCacheCreate + totalCacheRead;
-      if (tokensUsed === 0) return { active: false };
+      const tokensUsed = cur_in + cur_out + cur_cC + cur_cR;
+      if (tokensUsed === 0) {
+        // Build last-block info from previous window if available
+        const prevTokens = prev_in + prev_out + prev_cC + prev_cR;
+        if (prevTokens > 0 && prevNewest) {
+          return {
+            active: false,
+            lastBlockEndedAt: new Date(prevNewest + windowMs).toISOString(),
+            lastBlockStartedAt: prevOldest ? new Date(prevOldest).toISOString() : undefined,
+            lastBlockCostUSD: calcCost(prev_in, prev_out, prev_cR, prev_cC),
+          };
+        }
+        return { active: false };
+      }
 
-      const blockStart = oldestTimestamp ?? now;
+      const blockStart = curOldest ?? now;
       const minutesElapsed = Math.round((now - blockStart) / 60000);
       const minutesRemaining = Math.max(0, 300 - minutesElapsed);
-
-      // Estimate cost using same pricing as /cost
-      const SONNET_IN = 3, SONNET_OUT = 15; // per MTok (assume sonnet as baseline)
-      const estimatedCostUSD = Math.round((
-        (totalInput / 1_000_000) * SONNET_IN +
-        (totalOutput / 1_000_000) * SONNET_OUT +
-        (totalCacheRead / 1_000_000) * (SONNET_IN * 0.1) +
-        (totalCacheCreate / 1_000_000) * (SONNET_IN * 0.25)
-      ) * 100) / 100;
 
       return {
         active: true,
@@ -545,8 +574,8 @@ export async function observabilityRoutes(fastify: FastifyInstance, opts: Observ
         minutesElapsed,
         minutesRemaining,
         tokensUsed,
-        breakdown: { input: totalInput, output: totalOutput, cacheCreate: totalCacheCreate, cacheRead: totalCacheRead },
-        estimatedCostUSD,
+        breakdown: { input: cur_in, output: cur_out, cacheCreate: cur_cC, cacheRead: cur_cR },
+        estimatedCostUSD: calcCost(cur_in, cur_out, cur_cR, cur_cC),
       };
     } catch {
       return { active: false };

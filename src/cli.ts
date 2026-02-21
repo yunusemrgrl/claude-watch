@@ -958,10 +958,13 @@ program
       },
       {
         name: 'get_history',
-        description: 'Get recent prompt history across all projects (last 20 prompts with project and timestamp).',
+        description: 'Get recent prompt history across all projects. Supports pagination.',
         inputSchema: {
           type: 'object',
-          properties: { limit: { type: 'number', description: 'Number of prompts to return (default 20, max 50)' } },
+          properties: {
+            limit: { type: 'number', description: 'Number of prompts to return (default 20, max 500)' },
+            offset: { type: 'number', description: 'Skip first N prompts (for pagination, default 0)' },
+          },
           required: [],
         },
       },
@@ -1037,12 +1040,12 @@ program
           return JSON.stringify(data, null, 2);
         }
         case 'get_history': {
-          const args2 = args as { limit?: number };
-          const limit = Math.min(args2.limit ?? 20, 50);
-          const data = await tryFetch<{ prompts?: unknown[] }>('/history');
+          const args2 = args as { limit?: number; offset?: number };
+          const limit = Math.min(args2.limit ?? 20, 500);
+          const offset = args2.offset ?? 0;
+          const data = await tryFetch<unknown>(`/history?limit=${limit}&offset=${offset}`);
           if (!data) return 'claudedash server not running. Start with: npx claudedash start';
-          const prompts = (data.prompts ?? []).slice(0, limit);
-          return JSON.stringify({ prompts, total: data.prompts?.length ?? 0 }, null, 2);
+          return JSON.stringify(data, null, 2);
         }
         case 'get_hook_events': {
           const args3 = args as { limit?: number };
