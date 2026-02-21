@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Copy, Check, RotateCcw } from "lucide-react";
-import type { ClaudeSession, ClaudeTask, TokenUsage, QueueSummary, AgentRecord, HistoryPrompt } from "@/types";
+import type { ClaudeSession, ClaudeTask, TokenUsage, QueueSummary, AgentRecord, HistoryPrompt, BillingBlock } from "@/types";
 import { ContextHealthMini, ContextHealthWidget } from "@/components/ContextHealthWidget";
 import { TypingPrompt } from "@/components/TypingPrompt";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -31,6 +31,42 @@ export function LiveView({
     { sessionId: string; projectName: string | null; lastPrompt: string; updatedAt: string }[]
   >([]);
   const [lastCompaction, setLastCompaction] = useState<{ at: string; phase: string } | null>(null);
+  const [billingBlock, setBillingBlock] = useState<BillingBlock | null>(null);
+  const tokenHistoryRef = useRef<Map<string, Array<{ ts: number; tokens: number }>>>(new Map());
+
+  // Record token samples whenever sessions update (for burn rate calculation)
+  useEffect(() => {
+    const now = Date.now();
+    const history = tokenHistoryRef.current;
+    const cutoff = now - 10 * 60_000; // keep last 10 minutes
+    for (const session of sessions) {
+      const tokens = session.tokenUsage?.inputTokens ?? 0;
+      if (tokens <= 0) continue;
+      const arr = history.get(session.id) ?? [];
+      arr.push({ ts: now, tokens });
+      while (arr.length > 1 && arr[0].ts < cutoff) arr.shift();
+      history.set(session.id, arr);
+    }
+  }, [sessions]);
+
+  const getBurnRate = (sessionId: string): number | null => {
+    const arr = tokenHistoryRef.current.get(sessionId);
+    if (!arr || arr.length < 2) return null;
+    const oldest = arr[0];
+    const latest = arr[arr.length - 1];
+    const deltaTokens = latest.tokens - oldest.tokens;
+    const deltaMin = (latest.ts - oldest.ts) / 60_000;
+    if (deltaMin < 0.25 || deltaTokens <= 0) return null;
+    return deltaTokens / deltaMin;
+  };
+
+  const getMinutesToFull = (session: ClaudeSession): number | null => {
+    const rate = getBurnRate(session.id);
+    if (!rate || !session.contextHealth?.maxTokens) return null;
+    const remaining = session.contextHealth.maxTokens - session.contextHealth.tokensUsed;
+    if (remaining <= 0) return 0;
+    return Math.round(remaining / rate);
+  };
 
   // Poll agent API + history data every 15 seconds
   useEffect(() => {
@@ -50,6 +86,10 @@ export function LiveView({
           const compact = d.events.find(e => e.event === 'PreCompact' || e.event === 'PostCompact');
           if (compact) setLastCompaction({ at: compact.receivedAt, phase: compact.event === 'PreCompact' ? 'pre' : 'post' });
         })
+        .catch(() => {});
+      void fetch("/billing-block")
+        .then((r) => r.ok ? r.json() : null)
+        .then((d) => { if (d) setBillingBlock(d as BillingBlock); })
         .catch(() => {});
       void fetch("/history")
         .then((r) => r.ok ? r.json() : null)
@@ -312,6 +352,17 @@ export function LiveView({
                     <ContextHealthMini health={session.contextHealth} />
                   </div>
                 </div>
+                {(() => {
+                  const rate = getBurnRate(session.id);
+                  const mins = getMinutesToFull(session);
+                  if (!rate) return null;
+                  return (
+                    <div className="text-[9px] text-muted-foreground/50 mt-0.5 leading-tight">
+                      {formatTokens(Math.round(rate))}/min
+                      {mins != null && <span className="ml-1 text-chart-3">~{mins}min</span>}
+                    </div>
+                  );
+                })()}
                 {((session.linesAdded ?? 0) > 0 || (session.gitCommits ?? 0) > 0) && (
                   <div className="flex items-center gap-2 text-[10px] mt-1">
                     {(session.linesAdded ?? 0) > 0 && (
@@ -380,6 +431,21 @@ export function LiveView({
             </div>
           );
         })()}
+
+        {/* Billing block projection */}
+        {billingBlock?.active && billingBlock.minutesRemaining != null && (
+          <div className="border-t border-sidebar-border px-2 py-1.5 shrink-0">
+            <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wide">Billing Block</span>
+            <div className="text-[9px] text-chart-3 mt-0.5 leading-tight">
+              ~{billingBlock.minutesRemaining}min left
+              {billingBlock.estimatedCostUSD != null && billingBlock.minutesElapsed != null && billingBlock.minutesElapsed > 0 && (
+                <span className="ml-1 text-muted-foreground">
+                  · est. ${(billingBlock.estimatedCostUSD * (1 + billingBlock.minutesRemaining / billingBlock.minutesElapsed)).toFixed(2)}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Agent API footer panel */}
         {(queueSummary || agents.length > 0) && (
