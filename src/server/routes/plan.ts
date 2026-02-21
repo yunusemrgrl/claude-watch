@@ -12,12 +12,12 @@ import type { Snapshot, InsightsResponse } from '../../core/types.js';
 
 export interface PlanRouteOptions {
   claudeDir: string;
-  agentScopeDir?: string;
+  planDir?: string;
   emitter?: EventEmitter;
 }
 
-function readQueueParseConfig(agentScopeDir: string): QueueParseConfig | undefined {
-  const configPath = join(agentScopeDir, 'config.json');
+function readQueueParseConfig(planDir: string): QueueParseConfig | undefined {
+  const configPath = join(planDir, 'config.json');
   if (!existsSync(configPath)) return undefined;
   try {
     const configData = JSON.parse(readFileSync(configPath, 'utf-8'));
@@ -27,10 +27,10 @@ function readQueueParseConfig(agentScopeDir: string): QueueParseConfig | undefin
 }
 
 export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOptions): Promise<void> {
-  const { claudeDir, agentScopeDir, emitter } = opts;
+  const { claudeDir, planDir, emitter } = opts;
 
   fastify.get('/snapshot', async () => {
-    if (!agentScopeDir) {
+    if (!planDir) {
       return {
         snapshot: null,
         queueErrors: ['Plan mode not configured. Run "claudedash init" first.'],
@@ -39,8 +39,8 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
       };
     }
 
-    const queuePath = join(agentScopeDir, 'queue.md');
-    const logPath = join(agentScopeDir, 'execution.log');
+    const queuePath = join(planDir, 'queue.md');
+    const logPath = join(planDir, 'execution.log');
 
     if (!existsSync(queuePath)) {
       return {
@@ -51,7 +51,7 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
       };
     }
 
-    const queueParseConfig = readQueueParseConfig(agentScopeDir);
+    const queueParseConfig = readQueueParseConfig(planDir);
     const queueResult = parseQueue(readFileSync(queuePath, 'utf-8'), queueParseConfig);
 
     if (queueResult.errors.length > 0) {
@@ -90,7 +90,7 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
 
   fastify.get('/insights', async () => {
     const hasLive = existsSync(join(claudeDir, 'tasks')) || existsSync(join(claudeDir, 'todos'));
-    const hasPlan = agentScopeDir ? existsSync(join(agentScopeDir, 'queue.md')) : false;
+    const hasPlan = planDir ? existsSync(join(planDir, 'queue.md')) : false;
 
     const response: InsightsResponse = {
       mode: hasLive && hasPlan ? 'both' : hasLive ? 'live' : 'plan',
@@ -101,11 +101,11 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
       response.live = computeLiveInsights(readSessions(claudeDir));
     }
 
-    if (hasPlan && agentScopeDir) {
-      const queuePath = join(agentScopeDir, 'queue.md');
-      const logPath = join(agentScopeDir, 'execution.log');
+    if (hasPlan && planDir) {
+      const queuePath = join(planDir, 'queue.md');
+      const logPath = join(planDir, 'execution.log');
       if (existsSync(queuePath)) {
-        const queueParseConfig = readQueueParseConfig(agentScopeDir);
+        const queueParseConfig = readQueueParseConfig(planDir);
         const queueResult = parseQueue(readFileSync(queuePath, 'utf-8'), queueParseConfig);
         if (queueResult.errors.length === 0) {
           let logResult = parseLog('');
@@ -122,8 +122,8 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
   });
 
   fastify.get<{ Querystring: { taskId?: string; file?: string } }>('/quality-timeline', async (request) => {
-    if (!agentScopeDir) return { events: [] };
-    const logPath = join(agentScopeDir, 'execution.log');
+    if (!planDir) return { events: [] };
+    const logPath = join(planDir, 'execution.log');
     if (!existsSync(logPath)) return { events: [] };
     try {
       let events = parseQualityTimeline(readFileSync(logPath, 'utf-8'));
@@ -142,14 +142,14 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
   fastify.post<{
     Body: { subject: string; priority?: string; dependsOn?: string };
   }>('/plan/task', async (request, reply) => {
-    if (!agentScopeDir) return reply.code(400).send({ error: 'Plan mode not configured' });
+    if (!planDir) return reply.code(400).send({ error: 'Plan mode not configured' });
 
     const { subject, priority = 'medium', dependsOn = '-' } = request.body ?? {};
     if (!subject || typeof subject !== 'string' || !subject.trim()) {
       return reply.code(400).send({ error: 'subject is required' });
     }
 
-    const queuePath = join(agentScopeDir, 'queue.md');
+    const queuePath = join(planDir, 'queue.md');
     if (!existsSync(queuePath)) return reply.code(400).send({ error: 'queue.md not found' });
 
     // Determine next task ID (count existing ## S\d+-T\d+ headers)
@@ -178,7 +178,7 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
     Params: { taskId: string };
     Body: { status: 'DONE' | 'BLOCKED' | 'FAILED'; reason?: string };
   }>('/plan/task/:taskId', async (request, reply) => {
-    if (!agentScopeDir) return reply.code(400).send({ error: 'Plan mode not configured' });
+    if (!planDir) return reply.code(400).send({ error: 'Plan mode not configured' });
 
     const { taskId } = request.params;
     const { status, reason } = request.body ?? {};
@@ -187,7 +187,7 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
       return reply.code(400).send({ error: 'status must be DONE, BLOCKED, or FAILED' });
     }
 
-    const logPath = join(agentScopeDir, 'execution.log');
+    const logPath = join(planDir, 'execution.log');
     const entry: Record<string, unknown> = {
       task_id: taskId,
       status,
@@ -211,7 +211,7 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
   // POST /log — agent HTTP execution log append (ai_feedback.md #3)
   fastify.post<{ Body: { task_id?: string; status?: string; agent?: string; reason?: string; meta?: unknown } }>(
     '/log', async (request, reply) => {
-      if (!agentScopeDir) return reply.code(404).send({ error: 'Plan mode not configured. Run claudedash init first.' });
+      if (!planDir) return reply.code(404).send({ error: 'Plan mode not configured. Run claudedash init first.' });
 
       const { task_id, status, agent = 'agent', reason, meta } = request.body ?? {};
       if (!task_id) return reply.code(400).send({ error: 'task_id is required' });
@@ -219,7 +219,7 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
         return reply.code(400).send({ error: 'status must be DONE, FAILED, or BLOCKED' });
       }
 
-      const logPath = join(agentScopeDir, 'execution.log');
+      const logPath = join(planDir, 'execution.log');
       const entry: Record<string, unknown> = {
         task_id,
         status,
@@ -256,18 +256,18 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
 
   // GET /queue — computed queue snapshot for agents (ai_feedback.md #1)
   fastify.get('/queue', async () => {
-    if (!agentScopeDir) {
+    if (!planDir) {
       return { tasks: [], summary: { total: 0, done: 0, failed: 0, blocked: 0, ready: 0 }, errors: ['Plan mode not configured'] };
     }
 
-    const queuePath = join(agentScopeDir, 'queue.md');
-    const logPath = join(agentScopeDir, 'execution.log');
+    const queuePath = join(planDir, 'queue.md');
+    const logPath = join(planDir, 'execution.log');
 
     if (!existsSync(queuePath)) {
       return { tasks: [], summary: { total: 0, done: 0, failed: 0, blocked: 0, ready: 0 }, errors: ['queue.md not found'] };
     }
 
-    const queueParseConfig = readQueueParseConfig(agentScopeDir);
+    const queueParseConfig = readQueueParseConfig(planDir);
     const queueResult = parseQueue(readFileSync(queuePath, 'utf-8'), queueParseConfig);
     if (queueResult.errors.length > 0) {
       return { tasks: [], summary: { total: 0, done: 0, failed: 0, blocked: 0, ready: 0 }, errors: queueResult.errors };

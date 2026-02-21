@@ -471,7 +471,7 @@ program
         claudeDir,
         port,
         host,
-        agentScopeDir: hasPlan ? claudeWatchDir : undefined,
+        planDir: hasPlan ? claudeWatchDir : undefined,
         token,
       });
 

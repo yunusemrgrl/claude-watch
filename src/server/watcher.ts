@@ -5,7 +5,7 @@ import { join } from 'path';
 
 export interface WatcherOptions {
   claudeDir: string;
-  agentScopeDir?: string;
+  planDir?: string;
 }
 
 export interface WatchEvent {
@@ -35,9 +35,9 @@ export function createWatcher(options: WatcherOptions): { watcher: FSWatcher; em
   }
 
   // Watch claudedash files if configured
-  if (options.agentScopeDir && existsSync(options.agentScopeDir)) {
-    const queuePath = join(options.agentScopeDir, 'queue.md');
-    const logPath = join(options.agentScopeDir, 'execution.log');
+  if (options.planDir && existsSync(options.planDir)) {
+    const queuePath = join(options.planDir, 'queue.md');
+    const logPath = join(options.planDir, 'execution.log');
     if (existsSync(queuePath)) watchPaths.push(queuePath);
     if (existsSync(logPath)) watchPaths.push(logPath);
   }

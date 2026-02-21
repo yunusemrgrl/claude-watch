@@ -63,19 +63,19 @@ function readOneSSEEvent(timeoutMs = 5000): Promise<string> {
 
 describe('E2E Smoke — Live Mode + Quality + Context + Worktrees', () => {
   let tmpClaudeDir: string;
-  let tmpAgentScopeDir: string;
+  let tmpPlanDir: string;
   let sessionId: string;
 
   beforeAll(async () => {
     // --- Create realistic directory structure ---
     sessionId = 'e2e-smoke-session-001';
     tmpClaudeDir = join(tmpdir(), `claudedash-e2e-${Date.now()}`);
-    tmpAgentScopeDir = join(tmpClaudeDir, '.claudedash');
+    tmpPlanDir = join(tmpClaudeDir, '.claudedash');
 
     // Create session task files (legacy tasks/ format — individual JSON per task)
     const tasksDir = join(tmpClaudeDir, 'tasks', sessionId);
     mkdirSync(tasksDir, { recursive: true });
-    mkdirSync(tmpAgentScopeDir, { recursive: true });
+    mkdirSync(tmpPlanDir, { recursive: true });
 
     writeFileSync(join(tasksDir, '1.json'), JSON.stringify({
       id: '1',
@@ -106,7 +106,7 @@ describe('E2E Smoke — Live Mode + Quality + Context + Worktrees', () => {
     ].join('\n'));
 
     // Execution log with quality events
-    writeFileSync(join(tmpAgentScopeDir, 'execution.log'), [
+    writeFileSync(join(tmpPlanDir, 'execution.log'), [
       JSON.stringify({
         task_id: 'F1-1',
         status: 'DONE',
@@ -126,7 +126,7 @@ describe('E2E Smoke — Live Mode + Quality + Context + Worktrees', () => {
     // Start server
     await startServer({
       claudeDir: tmpClaudeDir,
-      agentScopeDir: tmpAgentScopeDir,
+      planDir: tmpPlanDir,
       port: PORT,
     });
   }, 30_000);

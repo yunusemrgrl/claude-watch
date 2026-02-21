@@ -8,7 +8,7 @@ import type { EventEmitter } from 'events';
 
 export interface LiveRouteOptions {
   claudeDir: string;
-  agentScopeDir?: string;
+  planDir?: string;
   emitter: EventEmitter;
 }
 
@@ -23,7 +23,7 @@ export interface HookEvent {
 }
 
 export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOptions): Promise<void> {
-  const { claudeDir, agentScopeDir, emitter } = opts;
+  const { claudeDir, planDir, emitter } = opts;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sseClients = new Set<(event: any) => void>();
   let lastSessions: string | null = null;
@@ -37,7 +37,7 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
 
   fastify.get('/health', async () => {
     const hasLive = existsSync(join(claudeDir, 'tasks')) || existsSync(join(claudeDir, 'todos'));
-    const hasPlan = agentScopeDir ? existsSync(join(agentScopeDir, 'queue.md')) : false;
+    const hasPlan = planDir ? existsSync(join(planDir, 'queue.md')) : false;
     return {
       status: 'ok',
       modes: { live: hasLive, plan: hasPlan },

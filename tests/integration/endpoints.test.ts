@@ -11,7 +11,7 @@ import { planRoutes } from '../../src/server/routes/plan.js';
  * Minimal server builder for integration tests.
  * Registers only the routes under test to avoid filesystem side effects.
  */
-async function buildTestServer(agentScopeDir: string, claudeDir: string) {
+async function buildTestServer(planDir: string, claudeDir: string) {
   const fastify = Fastify({ logger: false });
   await fastify.register(cors, { origin: true });
 
@@ -27,7 +27,7 @@ async function buildTestServer(agentScopeDir: string, claudeDir: string) {
   fastify.get<{ Querystring: { sessionId?: string; taskId?: string } }>(
     '/quality-timeline',
     async (request) => {
-      const logPath = join(agentScopeDir, 'execution.log');
+      const logPath = join(planDir, 'execution.log');
       if (!exists(logPath)) return { events: [] };
       try {
         const content = readFile(logPath, 'utf-8');
@@ -66,10 +66,10 @@ async function buildTestServer(agentScopeDir: string, claudeDir: string) {
   return fastify;
 }
 
-async function buildPlanServer(agentScopeDir: string, claudeDir: string) {
+async function buildPlanServer(planDir: string, claudeDir: string) {
   const fastify = Fastify({ logger: false });
   await fastify.register(staticPlugin, { root: claudeDir });
-  await planRoutes(fastify, { agentScopeDir, claudeDir });
+  await planRoutes(fastify, { planDir, claudeDir });
   await fastify.ready();
   return fastify;
 }

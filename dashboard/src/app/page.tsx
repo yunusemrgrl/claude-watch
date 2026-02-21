@@ -43,8 +43,8 @@ const NAV_TABS: {
   {
     id: "plan",
     icon: ClipboardList,
-    label: "Plan",
-    tooltip: "Queue-based task planning and execution tracker",
+    label: "Queue",
+    tooltip: "Task queue tracker — queue.md · execution.log · agent status",
     show: (m) => m.plan,
   },
   {
@@ -64,7 +64,7 @@ const NAV_TABS: {
   {
     id: "plans",
     icon: FileText,
-    label: "Plans",
+    label: "Docs",
     tooltip: "Claude Code plan documents from ~/.claude/plans/",
     show: () => true,
   },

@@ -14,7 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export interface ServerOptions {
-  agentScopeDir?: string;
+  planDir?: string;
   claudeDir: string;
   port: number;
   host?: string;
@@ -22,7 +22,7 @@ export interface ServerOptions {
 }
 
 export async function startServer(options: ServerOptions): Promise<void> {
-  const { claudeDir, port, agentScopeDir, host = '127.0.0.1', token } = options;
+  const { claudeDir, port, planDir, host = '127.0.0.1', token } = options;
 
   const fastify = Fastify({ logger: false, routerOptions: { ignoreTrailingSlash: true } });
 
@@ -72,12 +72,12 @@ export async function startServer(options: ServerOptions): Promise<void> {
     });
   }
 
-  const { watcher, emitter } = createWatcher({ claudeDir, agentScopeDir });
+  const { watcher, emitter } = createWatcher({ claudeDir, planDir });
 
   fastify.addHook('onClose', async () => { await watcher.close(); });
 
-  await fastify.register(liveRoutes, { claudeDir, agentScopeDir, emitter });
-  await fastify.register(planRoutes, { claudeDir, agentScopeDir, emitter });
+  await fastify.register(liveRoutes, { claudeDir, planDir, emitter });
+  await fastify.register(planRoutes, { claudeDir, planDir, emitter });
   await fastify.register(observabilityRoutes, { claudeDir });
 
   // Serve static dashboard + SPA fallback
