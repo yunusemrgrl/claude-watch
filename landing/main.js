@@ -383,6 +383,7 @@ window.addEventListener('DOMContentLoaded', () => {
     console.warn('anime.js not loaded — skipping animations');
     $$('[data-animate], #hero-badge, #hl-1, #hl-2, #hl-3, #hero-sub, #hero-ctas, #terminal-hint, #hero-demo')
       .forEach(el => { el.style.opacity = '1'; });
+    initScreenshotTabs();
     return;
   }
 
