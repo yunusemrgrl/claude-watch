@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Copy, Check, RotateCcw } from "lucide-react";
-import type { ClaudeSession, ClaudeTask, TokenUsage, QueueSummary, AgentRecord } from "@/types";
+import type { ClaudeSession, ClaudeTask, TokenUsage, QueueSummary, AgentRecord, HistoryPrompt } from "@/types";
 import { ContextHealthMini, ContextHealthWidget } from "@/components/ContextHealthWidget";
 import { TypingPrompt } from "@/components/TypingPrompt";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -27,8 +27,11 @@ export function LiveView({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [queueSummary, setQueueSummary] = useState<QueueSummary | null>(null);
   const [agents, setAgents] = useState<AgentRecord[]>([]);
+  const [resumableSessions, setResumableSessions] = useState<
+    { sessionId: string; projectName: string | null; lastPrompt: string; updatedAt: string }[]
+  >([]);
 
-  // Poll agent API data every 15 seconds
+  // Poll agent API + history data every 15 seconds
   useEffect(() => {
     function fetchAgentData() {
       void fetch("/queue")
@@ -38,6 +41,29 @@ export function LiveView({
       void fetch("/agents")
         .then((r) => r.ok ? r.json() : null)
         .then((d) => { if (d?.agents) setAgents(d.agents as AgentRecord[]); })
+        .catch(() => {});
+      void fetch("/history")
+        .then((r) => r.ok ? r.json() : null)
+        .then((d: { prompts?: HistoryPrompt[] } | null) => {
+          if (!d?.prompts) return;
+          // Group by sessionId, keep the latest entry per session
+          const map = new Map<string, HistoryPrompt>();
+          for (const p of d.prompts) {
+            const existing = map.get(p.sessionId);
+            if (!existing || p.timestamp > existing.timestamp) map.set(p.sessionId, p);
+          }
+          setResumableSessions(
+            [...map.values()]
+              .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+              .slice(0, 5)
+              .map((p) => ({
+                sessionId: p.sessionId,
+                projectName: p.projectName,
+                lastPrompt: p.display,
+                updatedAt: p.timestamp,
+              })),
+          );
+        })
         .catch(() => {});
     }
     fetchAgentData();
@@ -303,6 +329,34 @@ export function LiveView({
             ))}
           </div>
         </ScrollArea>
+
+        {/* Quick Resume panel */}
+        {resumableSessions.filter((r) => !sessions.some((s) => s.id === r.sessionId)).length > 0 && (
+          <div className="border-t border-sidebar-border p-2 space-y-1 shrink-0">
+            <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wide">Resume</span>
+            {resumableSessions
+              .filter((r) => !sessions.some((s) => s.id === r.sessionId))
+              .slice(0, 3)
+              .map((r) => (
+                <button
+                  key={r.sessionId}
+                  onClick={() => handleResumeSession(r.sessionId)}
+                  title={`Copy: claude resume ${r.sessionId}`}
+                  className="w-full text-left group flex items-start gap-1.5 p-1.5 rounded hover:bg-accent/50 transition-colors"
+                >
+                  <RotateCcw className="size-2.5 mt-0.5 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-medium text-foreground truncate leading-tight">
+                      {r.projectName ?? r.sessionId.slice(0, 8)}
+                    </div>
+                    <div className="text-[9px] text-muted-foreground truncate leading-tight">
+                      {r.lastPrompt.length > 40 ? r.lastPrompt.slice(0, 40) + "…" : r.lastPrompt}
+                    </div>
+                  </div>
+                </button>
+              ))}
+          </div>
+        )}
 
         {/* Agent API footer panel */}
         {(queueSummary || agents.length > 0) && (
