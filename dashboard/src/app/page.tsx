@@ -181,7 +181,7 @@ export default function Dashboard() {
 
           <div className="flex items-baseline gap-2">
             <h1 className="text-lg font-semibold text-foreground">claudedash</h1>
-            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">v0.9.0</span>
+            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">v1.0.0</span>
           </div>
 
           {/* Main nav tabs */}
