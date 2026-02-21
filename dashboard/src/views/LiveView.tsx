@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Copy, Check, RotateCcw } from "lucide-react";
+import { Copy, Check } from "lucide-react";
 import type { ClaudeSession, ClaudeTask, TokenUsage, QueueSummary, AgentRecord, HistoryPrompt, BillingBlock } from "@/types";
 import { ContextHealthMini, ContextHealthWidget } from "@/components/ContextHealthWidget";
 import { TypingPrompt } from "@/components/TypingPrompt";
@@ -245,7 +245,7 @@ export function LiveView({
       {/* Resume toast */}
       {resumeToast && (
         <div className="bg-chart-4/10 border-b border-chart-4/30 px-4 py-2 flex items-center gap-3 text-xs shrink-0">
-          <RotateCcw className="size-3 text-chart-4 shrink-0" />
+          <Copy className="size-3 text-chart-4 shrink-0" />
           <span className="text-foreground/80">Copied to clipboard:</span>
           <code className="font-mono text-chart-4 bg-chart-4/10 px-1.5 py-0.5 rounded">{resumeToast}</code>
           <button onClick={() => setResumeToast(null)} className="ml-auto text-muted-foreground hover:text-foreground">&times;</button>
@@ -401,7 +401,7 @@ export function LiveView({
                 title={`Copy 'claude resume ${session.id}' to clipboard`}
                 className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-accent transition-all text-muted-foreground hover:text-foreground"
               >
-                <RotateCcw className="size-2.5" />
+                <Copy className="size-2.5" />
               </button>
               </div>
             ))}
@@ -422,7 +422,7 @@ export function LiveView({
                   title={`Copy: claude resume ${r.sessionId}`}
                   className="w-full text-left group flex items-start gap-1.5 p-1.5 rounded hover:bg-accent/50 transition-colors"
                 >
-                  <RotateCcw className="size-2.5 mt-0.5 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                  <Copy className="size-2.5 mt-0.5 shrink-0 text-muted-foreground group-hover:text-foreground" />
                   <div className="min-w-0">
                     <div className="text-[10px] font-medium text-foreground truncate leading-tight">
                       {r.projectName ?? r.sessionId.slice(0, 8)}
@@ -689,7 +689,7 @@ export function LiveView({
                             className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                             title={`Copy 'claude resume ${selectedSession.id}' to clipboard`}
                           >
-                            <RotateCcw className="size-3" />
+                            <Copy className="size-3" />
                             <span>Resume session</span>
                           </button>
                         )}
