@@ -980,6 +980,11 @@ program
         inputSchema: { type: 'object', properties: {}, required: [] },
       },
       {
+        name: 'get_current_session',
+        description: 'Get the current Claude Code session. Uses $CLAUDE_SESSION_ID env var for exact match, falls back to the most recently updated session.',
+        inputSchema: { type: 'object', properties: {}, required: [] },
+      },
+      {
         name: 'log_task',
         description: 'Log a task result to the execution log. Use this after completing, failing, or getting blocked on a task.',
         inputSchema: {
@@ -1041,6 +1046,27 @@ program
           const data = await tryFetch<unknown>('/agents');
           if (!data) return 'claudedash server not running. Start with: npx claudedash start';
           return JSON.stringify(data, null, 2);
+        }
+        case 'get_current_session': {
+          const sessionsData = await tryFetch<{ sessions?: Array<{ id: string; updatedAt?: string; [key: string]: unknown }> }>('/sessions');
+          if (!sessionsData) return 'claudedash server not running. Start with: npx claudedash start';
+          const sessions = sessionsData.sessions ?? [];
+          if (sessions.length === 0) return JSON.stringify({ session: null, isCurrent: false, note: 'No active sessions found' });
+
+          // Try exact match by $CLAUDE_SESSION_ID env var
+          const envSessionId = process.env.CLAUDE_SESSION_ID;
+          if (envSessionId) {
+            const exact = sessions.find(s => s.id === envSessionId);
+            if (exact) return JSON.stringify({ ...exact, isCurrent: true, matchMethod: 'env-exact' }, null, 2);
+          }
+
+          // Fall back to most recently updated session
+          const sorted = [...sessions].sort((a, b) => {
+            const ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+            const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+            return tb - ta;
+          });
+          return JSON.stringify({ ...sorted[0], isCurrent: true, matchMethod: 'most-recent' }, null, 2);
         }
         case 'log_task': {
           const { task_id, status, reason, agent } = args as { task_id?: string; status?: string; reason?: string; agent?: string };
