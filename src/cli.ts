@@ -933,8 +933,31 @@ program
       },
       {
         name: 'get_billing_block',
-        description: 'Get the current 5-hour billing block status, tokens used, and estimated cost.',
+        description: 'Get the current 5-hour billing block status, tokens used, estimated cost, and today\'s total cost.',
         inputSchema: { type: 'object', properties: {}, required: [] },
+      },
+      {
+        name: 'get_cost',
+        description: 'Get estimated token cost breakdown by model (from stats-cache). Shows total and per-model costs.',
+        inputSchema: { type: 'object', properties: {}, required: [] },
+      },
+      {
+        name: 'get_history',
+        description: 'Get recent prompt history across all projects (last 20 prompts with project and timestamp).',
+        inputSchema: {
+          type: 'object',
+          properties: { limit: { type: 'number', description: 'Number of prompts to return (default 20, max 50)' } },
+          required: [],
+        },
+      },
+      {
+        name: 'get_hook_events',
+        description: 'Get recent Claude Code hook events (PostToolUse, Stop) streamed via the hook architecture.',
+        inputSchema: {
+          type: 'object',
+          properties: { limit: { type: 'number', description: 'Number of events to return (default 20)' } },
+          required: [],
+        },
       },
       {
         name: 'get_agents',
@@ -970,9 +993,34 @@ program
           return JSON.stringify(data, null, 2);
         }
         case 'get_billing_block': {
-          const data = await tryFetch<unknown>('/billing-block');
+          const [block, cost] = await Promise.all([
+            tryFetch<Record<string, unknown>>('/billing-block'),
+            tryFetch<Record<string, unknown>>('/cost'),
+          ]);
+          if (!block) return 'claudedash server not running. Start with: npx claudedash start';
+          // Enrich with today's total cost even when block is inactive
+          const enriched = { ...block, todayCostUSD: (cost as { totalCostUSD?: number } | null)?.totalCostUSD ?? null };
+          return JSON.stringify(enriched, null, 2);
+        }
+        case 'get_cost': {
+          const data = await tryFetch<unknown>('/cost');
           if (!data) return 'claudedash server not running. Start with: npx claudedash start';
           return JSON.stringify(data, null, 2);
+        }
+        case 'get_history': {
+          const args2 = args as { limit?: number };
+          const limit = Math.min(args2.limit ?? 20, 50);
+          const data = await tryFetch<{ prompts?: unknown[] }>('/history');
+          if (!data) return 'claudedash server not running. Start with: npx claudedash start';
+          const prompts = (data.prompts ?? []).slice(0, limit);
+          return JSON.stringify({ prompts, total: data.prompts?.length ?? 0 }, null, 2);
+        }
+        case 'get_hook_events': {
+          const args3 = args as { limit?: number };
+          const limit = Math.min(args3.limit ?? 20, 100);
+          const data = await tryFetch<{ events?: unknown[] }>('/hook/events');
+          if (!data) return 'claudedash server not running. Start with: npx claudedash start';
+          return JSON.stringify({ events: (data.events ?? []).slice(0, limit) }, null, 2);
         }
         case 'get_agents': {
           const data = await tryFetch<unknown>('/agents');
@@ -1023,6 +1071,10 @@ program
       process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id, error: { code, message } }) + '\n');
     }
 
+    // Track pending async tool calls so we don't exit before they complete
+    let pendingCount = 0;
+    let stdinEnded = false;
+
     // Read newline-delimited JSON-RPC from stdin
     let buf = '';
     process.stdin.setEncoding('utf8');
@@ -1041,7 +1093,7 @@ program
           respond(req.id, {
             protocolVersion: '2024-11-05',
             capabilities: { tools: {} },
-            serverInfo: { name: 'claudedash', version: '1.0.1' },
+            serverInfo: { name: 'claudedash', version: program.version() },
           });
         } else if (req.method === 'notifications/initialized') {
           // no response needed
@@ -1049,8 +1101,12 @@ program
           respond(req.id, { tools: TOOLS });
         } else if (req.method === 'tools/call') {
           const params = (req.params ?? {}) as ToolCallParams;
-          void callTool(params.name ?? '', params.arguments ?? {}).then((text) => {
+          pendingCount++;
+          callTool(params.name ?? '', params.arguments ?? {}).then((text) => {
             respond(req.id, { content: [{ type: 'text', text }] });
+          }).finally(() => {
+            pendingCount--;
+            if (stdinEnded && pendingCount === 0) process.exit(0);
           });
         } else {
           respondError(req.id, -32601, `Method not found: ${req.method}`);
@@ -1058,7 +1114,10 @@ program
       }
     });
 
-    process.stdin.on('end', () => process.exit(0));
+    process.stdin.on('end', () => {
+      stdinEnded = true;
+      if (pendingCount === 0) process.exit(0);
+    });
     // Keep process alive
     process.stdin.resume();
   });

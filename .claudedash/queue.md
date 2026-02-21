@@ -64,3 +64,33 @@ Priority: medium
 Depends: -
 Description: `claudedash doctor` komutu. Kullanıcının kurulumunu kontrol eder: ~/.claude/ var mı? queue.md var mı? execution.log var mı? hooks kurulu mu? Port 4317 açık mı? Server versiyonu npm'deki latest ile eşleşiyor mu? Her kontrol için ✓ / ✗ + tavsiye. Bu "neden çalışmıyor?" sorusunu ortadan kaldırır.
 AC: `claudedash doctor` → her kontrol için sonuç. Eksik hook varsa `claudedash hooks install` önerisi. Port çakışması varsa alternatif port önerisi.
+
+# Slice S13 — MCP Genişletme (Self-Query Boşlukları)
+
+## S13-T1
+Area: CLI
+Priority: critical
+Depends: -
+Description: MCP'ye eksik tool'ları ekle: `get_cost` (stats-cache.json'dan bugünkü maliyet), `get_history` (history.jsonl'dan son 20 prompt), `get_hook_events` (son 20 hook event). Ayrıca `get_billing_block` inactive durumda dahi stats-cache'den tahmini günlük maliyeti döndürsün: `{ active: false, todayCostUSD: 1.24 }`. Bu 3 tool MCP client'ın "bugün ne harcadım, ne yaptım?" sorularını yanıtlar.
+AC: `tools/call get_cost` → `{ totalCostUSD, perModel }`. `tools/call get_history` → son 20 prompt listesi. `tools/call get_hook_events` → son hook event'leri. `get_billing_block` → inactive'de de cost alanı dolu.
+
+## S13-T2
+Area: CLI
+Priority: high
+Depends: -
+Description: MCP'ye agent lifecycle tool'ları ekle: `register_agent { agentId, name, taskId }` ve `send_heartbeat { agentId, status, taskId }`. Bu sayede MCP üzerinden çalışan bir agent kendini dashboard'a kayıt edebilir. Mevcut `POST /agent/register` ve `POST /agent/heartbeat` endpoint'lerini proxy'le. Ayrıca `create_task { slice, area, description, ac, dependsOn? }` tool'u: queue.md'ye yeni task ekler (S12-T2 ile aynı backend, MCP üzerinden expose).
+AC: `register_agent` → dashboard'da agent görünüyor. `create_task` → queue.md güncelleniyor, `get_queue` doğru task'ı döndürüyor.
+
+## S13-T3
+Area: Server
+Priority: high
+Depends: -
+Description: `GET /sessions/:sessionId/context` endpoint (S11-T6'nın uygulaması). JSONL dosyasını okur, son 20 mesajı parse eder, şunu döndür: `{ sessionId, messageCount, lastUserPrompt, lastAssistantSummary (ilk 300 char), toolCounts, recentTools: string[] }`. MCP'ye `get_session_context { sessionId }` tool olarak ekle. Büyük JSONL'lar için sadece son 500 satırı oku.
+AC: `GET /sessions/abc123/context` → özet JSON. `tools/call get_session_context { sessionId }` → aynı veriyi MCP üzerinden döndürüyor.
+
+## S13-T4
+Area: Server+Dashboard
+Priority: medium
+Depends: -
+Description: Stale session temizleme. `GET /sessions` şu an .claude/todos/ klasöründeki TÜM JSONL'ları döndürüyor — çok eski ve ilgisiz session'lar da dahil (örn. "agent-scope" projesi). Çözüm: (1) Son 7 günde güncellenmemiş session'ları varsayılan olarak filtrele. (2) Dashboard'da "Show all sessions" toggle ekle. (3) `GET /sessions?days=7` gibi query param desteği. Bu sidebar'ın gürültüsünü azaltır.
+AC: Default `GET /sessions` → sadece son 7 gün. `?days=all` → hepsi. Dashboard sidebar temiz.
