@@ -1013,8 +1013,8 @@ program
             tryFetch<Record<string, unknown>>('/cost'),
           ]);
           if (!block) return 'claudedash server not running. Start with: npx claudedash start';
-          // Enrich with today's total cost even when block is inactive
-          const enriched = { ...block, todayCostUSD: (cost as { totalCostUSD?: number } | null)?.totalCostUSD ?? null };
+          // Enrich with lifetime cost (note: this is cumulative, not just today)
+          const enriched = { ...block, lifetimeCostUSD: (cost as { totalCostUSD?: number } | null)?.totalCostUSD ?? null };
           return JSON.stringify(enriched, null, 2);
         }
         case 'get_cost': {

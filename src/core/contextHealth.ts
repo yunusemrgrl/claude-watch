@@ -44,10 +44,12 @@ function deriveWarningLevel(percentage: number): ContextWarningLevel {
 export function estimateContextPercentage(session: ClaudeSession, maxTokens = DEFAULT_MAX_TOKENS): number | null {
   if (!session.tokenUsage) return null;
 
-  const { inputTokens } = session.tokenUsage;
-  if (inputTokens <= 0) return null;
+  // Cache read tokens also occupy the context window, so include them
+  const { inputTokens, cacheReadTokens } = session.tokenUsage;
+  const tokensInContext = inputTokens + cacheReadTokens;
+  if (tokensInContext <= 0) return null;
 
-  const percentage = Math.min(100, (inputTokens / maxTokens) * 100);
+  const percentage = Math.min(100, (tokensInContext / maxTokens) * 100);
   return Math.round(percentage * 10) / 10; // 1 decimal place
 }
 
@@ -61,7 +63,7 @@ export function buildContextHealth(session: ClaudeSession, model?: string): Cont
   const percentage = estimateContextPercentage(session, maxTokens);
   if (percentage === null) return null;
 
-  const tokensUsed = session.tokenUsage!.inputTokens;
+  const tokensUsed = session.tokenUsage!.inputTokens + session.tokenUsage!.cacheReadTokens;
 
   return {
     percentage,
