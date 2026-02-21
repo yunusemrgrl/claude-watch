@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ClaudeTask, ComputedTask, SessionsResponse, SnapshotResponse } from "@/types";
+import type { ClaudeSession, ComputedTask, SessionsResponse, SnapshotResponse } from "@/types";
 
 function notify(title: string, body: string) {
   if (typeof window === "undefined" || !("Notification" in window)) return;
@@ -24,13 +24,15 @@ function updateTabTitle(activeCount: number, failedCount: number) {
 
 function diffLiveTasks(
   prev: Map<string, string>,
-  tasks: ClaudeTask[],
-): Array<{ subject: string; status: string }> {
-  const changes: Array<{ subject: string; status: string }> = [];
-  for (const task of tasks) {
-    const prevStatus = prev.get(task.id);
-    if (prevStatus && prevStatus !== task.status && task.status === "completed") {
-      changes.push({ subject: task.subject, status: task.status });
+  sessions: ClaudeSession[],
+): Array<{ subject: string; project: string | null }> {
+  const changes: Array<{ subject: string; project: string | null }> = [];
+  for (const session of sessions) {
+    for (const task of session.tasks) {
+      const prevStatus = prev.get(task.id);
+      if (prevStatus && prevStatus !== task.status && task.status === "completed") {
+        changes.push({ subject: task.subject, project: session.projectName ?? null });
+      }
     }
   }
   return changes;
@@ -95,12 +97,15 @@ export function useNotifications() {
               const allTasks = data.sessions.flatMap((s) => s.tasks);
 
               if (initializedLive.current) {
-                const changes = diffLiveTasks(prevLiveMap.current, allTasks);
+                const changes = diffLiveTasks(prevLiveMap.current, data.sessions);
                 for (const change of changes) {
-                  const key = `live:${change.subject}:${change.status}`;
+                  const key = `live:${change.subject}`;
                   if (!notifiedSet.current.has(key)) {
                     notifiedSet.current.add(key);
-                    notify("Task completed ✓", change.subject);
+                    const body = change.project
+                      ? `${change.subject}\n${change.project}`
+                      : change.subject;
+                    notify("Task completed ✓", body);
                   }
                 }
               }
