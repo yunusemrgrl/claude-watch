@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { ClaudeSession, SessionsResponse } from "@/types";
 
-export function useSessions() {
+export function useSessions(showAll = false) {
   const [sessions, setSessions] = useState<ClaudeSession[]>([]);
   const [selectedSession, setSelectedSession] = useState<ClaudeSession | null>(null);
   const [connected, setConnected] = useState(false);
+  const [sessionCounts, setSessionCounts] = useState<{ total: number; filtered: number } | null>(null);
   const selectedSessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -13,10 +14,14 @@ export function useSessions() {
 
   const fetchSessions = useCallback(async () => {
     try {
-      const response = await fetch("/sessions");
+      const url = showAll ? "/sessions?days=all" : "/sessions";
+      const response = await fetch(url);
       if (!response.ok) return;
-      const result: SessionsResponse = await response.json();
+      const result: SessionsResponse & { total?: number; filtered?: number } = await response.json();
       setSessions(result.sessions);
+      if (result.total != null) {
+        setSessionCounts({ total: result.total, filtered: result.filtered ?? result.sessions.length });
+      }
       const currentId = selectedSessionIdRef.current;
       if (!currentId && result.sessions.length > 0) {
         setSelectedSession(result.sessions[0]);
@@ -27,7 +32,7 @@ export function useSessions() {
     } catch {
       // ignore
     }
-  }, []);
+  }, [showAll]);
 
   useEffect(() => {
     fetchSessions();
@@ -48,5 +53,5 @@ export function useSessions() {
     };
   }, [fetchSessions]);
 
-  return { sessions, selectedSession, setSelectedSession, connected };
+  return { sessions, selectedSession, setSelectedSession, connected, sessionCounts };
 }

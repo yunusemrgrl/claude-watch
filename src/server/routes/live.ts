@@ -91,14 +91,29 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
     } catch { return null; }
   }
 
-  fastify.get<{ Querystring: { model?: string } }>('/sessions', async (request) => {
+  fastify.get<{ Querystring: { model?: string; days?: string } }>('/sessions', async (request) => {
     const model = request.query.model;
-    const sessions = readSessions(claudeDir).map(s => ({
+    const daysParam = request.query.days;
+
+    let cutoffMs: number | null = null;
+    if (daysParam !== 'all' && daysParam !== '0') {
+      const days = daysParam ? parseInt(daysParam, 10) : 7;
+      if (!isNaN(days) && days > 0) {
+        cutoffMs = Date.now() - days * 24 * 60 * 60 * 1000;
+      }
+    }
+
+    const allSessions = readSessions(claudeDir);
+    const filtered = cutoffMs
+      ? allSessions.filter(s => !s.updatedAt || new Date(s.updatedAt).getTime() >= cutoffMs)
+      : allSessions;
+
+    const sessions = filtered.map(s => ({
       ...s,
       contextHealth: buildContextHealth(s, model),
       ...readSessionMeta(s.id),
     }));
-    return { sessions };
+    return { sessions, total: allSessions.length, filtered: filtered.length };
   });
 
   fastify.get<{ Params: { id: string }; Querystring: { model?: string } }>('/sessions/:id', async (request) => {

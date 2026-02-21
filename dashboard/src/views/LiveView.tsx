@@ -18,7 +18,8 @@ export function LiveView({
   sidebarCollapsed: boolean;
   mounted: boolean;
 }) {
-  const { sessions, selectedSession, setSelectedSession } = useSessions();
+  const [showAllSessions, setShowAllSessions] = useState(false);
+  const { sessions, selectedSession, setSelectedSession, sessionCounts } = useSessions(showAllSessions);
   const [selectedTask, setSelectedTask] = useState<ClaudeTask | null>(null);
   const [copiedTaskId, setCopiedTaskId] = useState(false);
   const [showSetupBanner, setShowSetupBanner] = useState(false);
@@ -288,10 +289,27 @@ export function LiveView({
           mounted ? "transition-all duration-300" : ""
         } ${sidebarCollapsed ? "w-0 border-r-0" : "w-[220px]"}`}
       >
-        <div className="p-3 border-b border-sidebar-border">
+        <div className="p-3 border-b border-sidebar-border flex items-center justify-between gap-2">
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
             Sessions
           </span>
+          {sessionCounts && sessionCounts.total > sessionCounts.filtered && !showAllSessions && (
+            <button
+              onClick={() => setShowAllSessions(true)}
+              className="text-[9px] text-muted-foreground/60 hover:text-muted-foreground underline shrink-0"
+              title={`${sessionCounts.total - sessionCounts.filtered} older sessions hidden`}
+            >
+              +{sessionCounts.total - sessionCounts.filtered} older
+            </button>
+          )}
+          {showAllSessions && (
+            <button
+              onClick={() => setShowAllSessions(false)}
+              className="text-[9px] text-muted-foreground/60 hover:text-muted-foreground underline shrink-0"
+            >
+              7d only
+            </button>
+          )}
         </div>
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-1">
