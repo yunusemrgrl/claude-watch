@@ -270,3 +270,67 @@ Bu retroyu yazarken claudedash'i fiilen kullanarak geliştirdim. Gözlemler:
 ```
 
 _Son güncelleme: 2026-02-21 — v1.0.1 retrospektifi_
+
+---
+
+## v1.1.1 MCP Self-Query Retrospektifi (2026-02-21)
+
+Bu bölüm, MCP toollarını `claudedash mcp` üzerinden canlı olarak sorgulayarak elde edilen gerçek bulgulara dayanır. Tüm veriler aşağıda gerçek sistemden alınmıştır.
+
+### Self-Query Sonuçları
+
+```
+get_sessions   → 4 session: CV, agent-scope (eski), VisiGol, page-builder
+get_cost       → totalCostUSD: 375.61 (Opus 4-6: $182.86, Sonnet 4-5: $131.01, Opus 4-5: $61.74)
+get_billing_block → { active: false, todayCostUSD: 375.61 }
+get_history    → son 5 prompt görünüyor, total: 50 (hardcap)
+get_queue      → 13 task, 3 DONE, 10 READY, 0 BLOCKED
+get_agents     → [] (kayıtlı agent yok)
+```
+
+### Bulunan Hatalar ve Boşluklar
+
+#### 1. `todayCostUSD` Yanlış Etiketlenmiş (BUG)
+- **Problem:** `get_billing_block` → `todayCostUSD: 375.61` döndürüyor. Bu "bugünkü" maliyet değil, stats-cache.json'daki **lifetime birikimli** maliyet. Etiket son derece yanıltıcı.
+- **Beklenen:** Ya `lifetimeCostUSD` olarak yeniden etiketle, ya da gerçek "bugünkü" maliyeti JSONL dosyalarından hesapla.
+- **Etki:** Yüksek. Claude veya kullanıcı "bugün $375 harcadım" diye anlayabiliyor.
+
+#### 2. `get_current_session` Tool Eksik
+- **Problem:** Bu MCP sorgusunu hangi session'dan yaptığımı bilmiyorum. `get_sessions` 4 session listeliyor ama hangisi "ben"im belli değil.
+- **Beklenen:** `get_current_session` → `$CLAUDE_SESSION_ID` env var'ı ile eşleşen session'ı döndür. Alternatif: en son güncellenen JSONL = muhtemelen aktif session.
+- **Etki:** Yüksek. Agent kendi session context'ini sorgulayamıyor.
+
+#### 3. History Hardcap (50 Entry)
+- **Problem:** `get_history` → `total: 50` döndürüyor, bu `/history` endpoint'inin sabit limiti. Son 50 prompttan fazlasına erişilemiyor.
+- **Beklenen:** `get_history { limit: N, offset: M }` ile sayfalama. Ya da en azından limit'i 200'e çıkar.
+- **Etki:** Orta. Uzun dönem çalışma geçmişi görülemiyor.
+
+#### 4. Context Health Yanlış Hesaplıyor
+- **Problem:** CV session için `contextHealth: 0.1%` gösteriyor. Ama bu session'da 5.9M `cacheReadInputTokens` var. Hesaplama sadece `inputTokens / contextWindowSize` yapıyor — cache token'larını saymıyor.
+- **Beklenen:** `(inputTokens + cacheReadInputTokens) / contextWindowSize` kullanılmalı. Cache okuma da context penceresini doluyor.
+- **Etki:** Yüksek. "Context dolmak üzere" uyarısı yanlış zamanda (veya hiç) tetiklenmiyor.
+
+#### 5. `get_billing_block` Son Block Bilgisi Yok
+- **Problem:** Billing block inactive olduğunda sadece `{ active: false, todayCostUSD: X }` dönüyor. Son block ne zaman bitti, ne kadara mal oldu bilinmiyor.
+- **Beklenen:** `{ active: false, lastBlockEndedAt: "...", lastBlockCostUSD: 2.45, todayCostUSD: X }` — stats-cache'den alınabilir.
+- **Etki:** Düşük/Orta. Geçmiş billing pattern analizi yapılamıyor.
+
+#### 6. `agent-scope` Eski Session Görünüyor
+- **Problem:** `get_sessions` ile "agent-scope" projesi hâlâ listeleniyor. Bu proje rename edilip claudedash oldu, 10+ gün önce son aktivite. Session listesini kirletiyor.
+- **Çözüm:** S13-T4 (7 günlük filtre) zaten planlanmış.
+
+### Öncelik Sırası (Yeni Bulgulara Göre)
+
+```
+1. todayCostUSD etiket düzeltmesi  → BUG, yanıltıcı, acil
+2. Context health hesap düzeltmesi → BUG, yanlış uyarı zamanlaması
+3. get_current_session tool        → Agent kimlik tespiti için kritik
+4. History pagination              → Uzun geçmişe erişim için önemli
+5. get_billing_block geçmiş block  → Analiz için yararlı
+```
+
+### Genel Değerlendirme
+
+MCP entegrasyonu çalışıyor — 6 tool, tüm temel sorular yanıtlanabilir hale geldi. Ama kalite sorunları var: yanlış etiketler, yanlış hesaplamalar, eksik identity. Araçlar var ama güvenilir değil henüz. S14 slice'ı bu bug'ları kapatmalı.
+
+_Son güncelleme: 2026-02-21 — v1.1.1 MCP self-query retrospektifi_

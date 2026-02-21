@@ -11,7 +11,7 @@ const program = new Command();
 program
   .name('claudedash')
   .description('Live Kanban, quality gates and context health monitoring for Claude Code agents')
-  .version('1.1.1');
+  .version('1.1.2');
 
 program
   .command('init')
@@ -823,8 +823,10 @@ program
   .command('hooks <action>')
   .description('Manage Claude Code hooks integration (actions: install, status, uninstall)')
   .option('--port <port>', 'claudedash server port', '4317')
-  .action((action: string, opts: { port: string }) => {
+  .option('--all', 'Also install PreCompact + PostCompact hooks for context persistence')
+  .action((action: string, opts: { port: string; all?: boolean }) => {
     const port = opts.port;
+    const installAll = !!opts.all;
     const settingsPath = join(process.env.HOME ?? '~', '.claude', 'settings.json');
 
     if (action === 'status') {
@@ -835,17 +837,21 @@ program
       const raw = readFileSync(settingsPath, 'utf8');
       const settings = JSON.parse(raw) as Record<string, unknown>;
       const hooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
-      const hasPostTool = (hooks.PostToolUse ?? []).some((h: unknown) =>
-        typeof h === 'object' && JSON.stringify(h).includes('claudedash') || JSON.stringify(h).includes(`${port}/hook`)
-      );
-      const hasStop = (hooks.Stop ?? []).some((h: unknown) =>
+      const hasHook = (key: string) => (hooks[key] ?? []).some((h: unknown) =>
         typeof h === 'object' && (JSON.stringify(h).includes('claudedash') || JSON.stringify(h).includes(`${port}/hook`))
       );
       console.log(`\nclaudedash hooks status (port ${port}):\n`);
-      console.log(`  PostToolUse: ${hasPostTool ? '\x1b[32m✓ installed\x1b[0m' : '\x1b[31m✗ not installed\x1b[0m'}`);
-      console.log(`  Stop:        ${hasStop ? '\x1b[32m✓ installed\x1b[0m' : '\x1b[31m✗ not installed\x1b[0m'}`);
-      if (!hasPostTool || !hasStop) {
-        console.log(`\nRun \x1b[36mnpx claudedash hooks install\x1b[0m to enable real-time tool event streaming.\n`);
+      console.log(`  PostToolUse:  ${hasHook('PostToolUse') ? '\x1b[32m✓ installed\x1b[0m' : '\x1b[31m✗ not installed\x1b[0m'}`);
+      console.log(`  Stop:         ${hasHook('Stop') ? '\x1b[32m✓ installed\x1b[0m' : '\x1b[31m✗ not installed\x1b[0m'}`);
+      console.log(`  PreCompact:   ${hasHook('PreCompact') ? '\x1b[32m✓ installed\x1b[0m' : '\x1b[33m- not installed\x1b[0m'}`);
+      console.log(`  PostCompact:  ${hasHook('PostCompact') ? '\x1b[32m✓ installed\x1b[0m' : '\x1b[33m- not installed\x1b[0m'}`);
+      if (!hasHook('PostToolUse') || !hasHook('Stop')) {
+        console.log(`\nRun \x1b[36mnpx claudedash hooks install\x1b[0m to enable real-time tool event streaming.`);
+      }
+      if (!hasHook('PreCompact') || !hasHook('PostCompact')) {
+        console.log(`Run \x1b[36mnpx claudedash hooks install --all\x1b[0m to also enable context compaction state.\n`);
+      } else {
+        console.log('');
       }
       return;
     }
@@ -862,23 +868,30 @@ program
 
       const hooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
 
-      // PostToolUse hook
-      const postToolEntry = { matcher: '', hooks: [{ type: 'command', command: hookCmd('PostToolUse') }] };
-      if (!Array.isArray(hooks.PostToolUse)) hooks.PostToolUse = [];
-      const alreadyPost = hooks.PostToolUse.some((h: unknown) => JSON.stringify(h).includes(`${port}/hook`));
-      if (!alreadyPost) hooks.PostToolUse.push(postToolEntry);
+      const installHook = (key: string) => {
+        const entry = { matcher: '', hooks: [{ type: 'command', command: hookCmd(key) }] };
+        if (!Array.isArray(hooks[key])) hooks[key] = [];
+        const already = (hooks[key] as unknown[]).some((h: unknown) => JSON.stringify(h).includes(`${port}/hook`));
+        if (!already) (hooks[key] as unknown[]).push(entry);
+      };
 
-      // Stop hook
-      const stopEntry = { matcher: '', hooks: [{ type: 'command', command: hookCmd('Stop') }] };
-      if (!Array.isArray(hooks.Stop)) hooks.Stop = [];
-      const alreadyStop = hooks.Stop.some((h: unknown) => JSON.stringify(h).includes(`${port}/hook`));
-      if (!alreadyStop) hooks.Stop.push(stopEntry);
+      installHook('PostToolUse');
+      installHook('Stop');
+
+      if (installAll) {
+        installHook('PreCompact');
+        installHook('PostCompact');
+      }
 
       settings.hooks = hooks;
       writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
       console.log(`\n\x1b[32m✓ claudedash hooks installed\x1b[0m in ~/.claude/settings.json`);
       console.log(`  PostToolUse → POST http://localhost:${port}/hook`);
       console.log(`  Stop        → POST http://localhost:${port}/hook`);
+      if (installAll) {
+        console.log(`  PreCompact  → POST http://localhost:${port}/hook`);
+        console.log(`  PostCompact → POST http://localhost:${port}/hook`);
+      }
       console.log(`\nStart claudedash and run a Claude Code session to see real-time tool events.\n`);
       return;
     }
@@ -894,6 +907,8 @@ program
       );
       if (Array.isArray(hooks.PostToolUse)) hooks.PostToolUse = filterHook(hooks.PostToolUse);
       if (Array.isArray(hooks.Stop)) hooks.Stop = filterHook(hooks.Stop);
+      if (Array.isArray(hooks.PreCompact)) hooks.PreCompact = filterHook(hooks.PreCompact);
+      if (Array.isArray(hooks.PostCompact)) hooks.PostCompact = filterHook(hooks.PostCompact);
       settings.hooks = hooks;
       writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
       console.log(`\n\x1b[32m✓ claudedash hooks removed\x1b[0m from ~/.claude/settings.json\n`);

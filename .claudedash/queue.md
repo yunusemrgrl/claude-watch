@@ -94,3 +94,40 @@ Priority: medium
 Depends: -
 Description: Stale session temizleme. `GET /sessions` şu an .claude/todos/ klasöründeki TÜM JSONL'ları döndürüyor — çok eski ve ilgisiz session'lar da dahil (örn. "agent-scope" projesi). Çözüm: (1) Son 7 günde güncellenmemiş session'ları varsayılan olarak filtrele. (2) Dashboard'da "Show all sessions" toggle ekle. (3) `GET /sessions?days=7` gibi query param desteği. Bu sidebar'ın gürültüsünü azaltır.
 AC: Default `GET /sessions` → sadece son 7 gün. `?days=all` → hepsi. Dashboard sidebar temiz.
+
+# Slice S14 — MCP Self-Query Bug Düzeltmeleri
+
+## S14-T1
+Area: Server+CLI
+Priority: critical
+Depends: -
+Description: `todayCostUSD` etiket hatası düzelt. `get_billing_block` ve `/billing-block` endpoint'i şu an stats-cache.json'dan lifetime birikimli maliyeti `todayCostUSD` olarak etiketliyor — bu son derece yanıltıcı. Düzeltme seçenekleri: (A) Alanı `lifetimeCostUSD` olarak yeniden etiketle + stats-cache'de date bilgisi varsa gerçek "bugün" hesapla; (B) JSONL dosyalarından bugünkü (son 24h) mesajlardaki `costUSD` alanlarını toplayarak gerçek günlük maliyet hesapla. (B) daha doğru ama daha pahalı. Minimum: alanı `totalCostUSD` olarak rename et, `todayCostUSD` tamamen kaldır veya ayrı hesapla.
+AC: `get_billing_block` → `todayCostUSD` alanı gerçekten bugüne ait. Ya da alan `lifetimeCostUSD` ile değiştiriliyor. `/cost` endpoint'i ile tutarlı.
+
+## S14-T2
+Area: Server
+Priority: critical
+Depends: -
+Description: Context health hesabını düzelt. Şu an `contextHealth = inputTokens / contextWindowSize`. Ama `cacheReadInputTokens` da context penceresini dolduruyor — yüksek cache kullanımlı session'lar (ör. 5.9M cacheReadTokens) %0.1 gösteriyor. Doğru hesap: `(inputTokens + cacheReadInputTokens) / contextWindowSize`. `/sessions` endpoint'indeki her session nesnesi için düzelt. Dashboard'da context bar yüzdesi ve "context dolmak üzere" uyarı eşiği de buna bağlı.
+AC: Cache-heavy session'da (ör. 5.9M cacheRead) contextHealth gerçekçi yüzde gösteriyor. Warning threshold hâlâ 80%+ için çalışıyor.
+
+## S14-T3
+Area: CLI
+Priority: high
+Depends: -
+Description: MCP'ye `get_current_session` tool'u ekle. Agent hangi session'da çalıştığını bilmeli. Çözüm: (1) `$CLAUDE_SESSION_ID` env var'ı varsa doğrudan o session'ı döndür; (2) yoksa en son güncellenen JSONL dosyasını döndür (muhtemelen aktif session). Döndürülecek: tam session nesnesi + `isCurrent: true` flag. Bu tool agent'ın kendi context'ini (hangi proje, kaç token kullandım) sorgulayabilmesini sağlar.
+AC: `tools/call get_current_session` → en az `{ sessionId, projectName, contextHealth, totalTokens }` döndürüyor. Env var varsa kesin eşleşme, yoksa best-guess.
+
+## S14-T4
+Area: Server
+Priority: medium
+Depends: -
+Description: `/history` endpoint'ine sayfalama ekle. Şu an sabit 50 satır limiti var. Parametre: `?limit=N&offset=M` (max limit: 500). `get_history` MCP tool da `limit` ve `offset` parametresi alsın. history.jsonl büyük olabilir — sadece son N satırı okumak için `fs.statSync` + offset-from-end okuma kullan (tüm dosyayı okumaktan kaçın).
+AC: `GET /history?limit=100&offset=50` → 100 prompt, 50'den itibaren. `tools/call get_history { limit: 100 }` → 100 prompt. Büyük dosyalarda timeout yok.
+
+## S14-T5
+Area: Server
+Priority: low
+Depends: -
+Description: `get_billing_block` ve `/billing-block`'a son billing block bilgisini ekle. Inactive durumda stats-cache'den son block'un başlangıç/bitiş zamanını ve maliyetini çıkar. Response'a şunu ekle: `{ active: false, lastBlockStartedAt?, lastBlockEndedAt?, lastBlockCostUSD? }`. stats-cache.json formatını incele, bu bilgi varsa parse et. Yoksa bu alanları atlayabilir.
+AC: Son billing block sonrası `get_billing_block` → `lastBlockEndedAt` + `lastBlockCostUSD` dolu. Bilgi yoksa alanlar atlanıyor (undefined değil, tamamen yok).

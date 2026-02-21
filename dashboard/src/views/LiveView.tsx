@@ -30,6 +30,7 @@ export function LiveView({
   const [resumableSessions, setResumableSessions] = useState<
     { sessionId: string; projectName: string | null; lastPrompt: string; updatedAt: string }[]
   >([]);
+  const [lastCompaction, setLastCompaction] = useState<{ at: string; phase: string } | null>(null);
 
   // Poll agent API + history data every 15 seconds
   useEffect(() => {
@@ -41,6 +42,14 @@ export function LiveView({
       void fetch("/agents")
         .then((r) => r.ok ? r.json() : null)
         .then((d) => { if (d?.agents) setAgents(d.agents as AgentRecord[]); })
+        .catch(() => {});
+      void fetch("/hook/events")
+        .then((r) => r.ok ? r.json() : null)
+        .then((d: { events?: Array<{ event: string; receivedAt: string }> } | null) => {
+          if (!d?.events) return;
+          const compact = d.events.find(e => e.event === 'PreCompact' || e.event === 'PostCompact');
+          if (compact) setLastCompaction({ at: compact.receivedAt, phase: compact.event === 'PreCompact' ? 'pre' : 'post' });
+        })
         .catch(() => {});
       void fetch("/history")
         .then((r) => r.ok ? r.json() : null)
@@ -357,6 +366,20 @@ export function LiveView({
               ))}
           </div>
         )}
+
+        {/* Last compaction indicator */}
+        {lastCompaction && (() => {
+          const diffMs = Date.now() - new Date(lastCompaction.at).getTime();
+          const diffMin = Math.floor(diffMs / 60_000);
+          const label = diffMin < 1 ? 'just now' : diffMin < 60 ? `${diffMin}m ago` : `${Math.floor(diffMin / 60)}h ago`;
+          return (
+            <div className="border-t border-sidebar-border px-2 py-1.5 shrink-0">
+              <div className="text-[9px] text-muted-foreground leading-tight">
+                <span className="font-medium text-chart-4">compact</span> {label} · state saved
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Agent API footer panel */}
         {(queueSummary || agents.length > 0) && (

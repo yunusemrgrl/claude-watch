@@ -1,8 +1,11 @@
 import type { FastifyInstance } from 'fastify';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
 import { join } from 'path';
 import { readSessions } from '../../core/todoReader.js';
 import { buildContextHealth } from '../../core/contextHealth.js';
+import { parseQueue } from '../../core/queueParser.js';
+import { parseLog } from '../../core/logParser.js';
+import { computeSnapshot } from '../../core/stateEngine.js';
 import type { WatchEvent } from '../watcher.js';
 import type { EventEmitter } from 'events';
 
@@ -129,6 +132,45 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
     hookEvents.push(hookEvent);
     if (hookEvents.length > 100) hookEvents.shift();
     for (const send of sseClients) send(hookEvent);
+
+    // PreCompact: save task state to compact-state.json
+    if (hookEvent.event === 'PreCompact' && planDir) {
+      try {
+        const queuePath = join(planDir, 'queue.md');
+        const logPath = join(planDir, 'execution.log');
+        if (existsSync(queuePath)) {
+          const queueResult = parseQueue(readFileSync(queuePath, 'utf-8'));
+          let logResult = parseLog('');
+          if (existsSync(logPath)) logResult = parseLog(readFileSync(logPath, 'utf-8'));
+          const snapshot = computeSnapshot(queueResult.tasks, logResult.events);
+          const readyTasks = snapshot.tasks.filter(t => t.status === 'READY').map(t => t.id);
+          const state = {
+            compactedAt: hookEvent.receivedAt,
+            sessionId: hookEvent.session ?? null,
+            summary: snapshot.summary,
+            readyTasks,
+          };
+          writeFileSync(join(planDir, 'compact-state.json'), JSON.stringify(state, null, 2), 'utf-8');
+        }
+      } catch { /* non-fatal */ }
+    }
+
+    // PostCompact: append restore reminder to CLAUDE.md
+    if (hookEvent.event === 'PostCompact' && planDir) {
+      try {
+        const statePath = join(planDir, 'compact-state.json');
+        if (existsSync(statePath)) {
+          const state = JSON.parse(readFileSync(statePath, 'utf-8')) as Record<string, unknown>;
+          const claudeMdPath = join(planDir, 'CLAUDE.md');
+          const summary = state.summary as Record<string, number> | undefined;
+          const ready = summary?.ready ?? 0;
+          const done = summary?.done ?? 0;
+          const note = `\n\n> **[compact-restore ${hookEvent.receivedAt}]** Context was compacted. State: ${done} DONE, ${ready} READY. Read \`.claudedash/compact-state.json\` for full task list.\n`;
+          appendFileSync(claudeMdPath, note, 'utf-8');
+        }
+      } catch { /* non-fatal */ }
+    }
+
     return { ok: true, receivedAt: hookEvent.receivedAt };
   });
 
