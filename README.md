@@ -78,17 +78,38 @@ Live mode is on by default. Both modes can run simultaneously.
 
 ## Screenshots
 
-### Live View — Session Kanban + Context Health
-![Live](landing/assets/live.png)
-
-### Queue — Plan Mode Task Board
-![Queue](landing/assets/queue.png)
-
-### Worktrees — Parallel Agent Visibility
-![Worktrees](landing/assets/worktrees.png)
-
-### Activity — Tool Analytics + Prompt History
-![Activity](landing/assets/activity.gif)
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="landing/assets/live.png" alt="Live View" /><br/>
+      <sub><b>Live View</b> — Session Kanban + context health per agent</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="landing/assets/queue.png" alt="Queue" /><br/>
+      <sub><b>Queue</b> — Plan mode task board with dependency graph</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="landing/assets/worktrees.png" alt="Worktrees" /><br/>
+      <sub><b>Worktrees</b> — Parallel agents across git branches</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="landing/assets/activity.gif" alt="Activity" /><br/>
+      <sub><b>Activity</b> — Tool analytics + full prompt history</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="landing/assets/config.png" alt="Config" /><br/>
+      <sub><b>Config</b> — Hook setup, port, token management</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="landing/assets/docs.png" alt="Docs" /><br/>
+      <sub><b>Docs</b> — Built-in reference for API + plan mode</sub>
+    </td>
+  </tr>
+</table>
 
 ---
 

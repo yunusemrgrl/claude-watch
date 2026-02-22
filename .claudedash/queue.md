@@ -177,3 +177,49 @@ Priority: high
 Depends: S16-T1
 Description: WorktreePanel.tsx'i yeni alanlara göre güncelle. (1) WorktreeCard'da isClaudeManaged=true ise küçük "claude" badge'i göster (mavi/chart-4 rengi). (2) worktreeName varsa branch adının yanında daha büyük göster, path'i ikincil yap. (3) Boş durum TypingPrompt'unu güncelle: "git worktree add" yerine "claude --worktree <name>" komutunu göster, ".claude/worktrees/<name>/ altında oluşturulur" açıklaması ekle. (4) WorktreeDetail'de isClaudeManaged için "Claude-managed" etiketi göster.
 AC: Claude-managed worktree'de badge görünüyor. Boş durumda "claude --worktree <name>" komutu yazıyor. Build ve lint temiz.
+
+# Slice S17 — Polish: README + Landing + Versioning
+
+## S17-T1
+Area: Landing
+Priority: critical
+Depends: -
+Description: Landing page tab CSS bug düzelt. `.sc-img { display: block }` kuralı `.sc-slide { display: none }` kuralını override ediyor, tüm slide'lar görünüyor. Fix: `.sc-img`'dan `display: block` kaldır (zaten `.sc-slide-active` yönetiyor). Test: 6 tab'dan sadece "Live" görünmeli başta.
+AC: Sayfa yüklenince sadece ilk slide görünüyor. Diğer tab'lara tıklanınca doğru slide açılıyor. Fotoğraflar alt alta değil.
+
+## S17-T2
+Area: Landing
+Priority: high
+Depends: S17-T1
+Description: activity.mp4 → GIF dönüştür. ffmpeg ile `landing/assets/activitiy.mp4`'ü `landing/assets/activity.gif`'e çevir (fps=8, scale=1200:-1, optimize et). HTML'de video tag'ini img tag'i ile değiştir. README'de mp4 referansını gif ile güncelle.
+AC: activity.gif var ve 2MB altında (kalite optimize). Landing'de tab aktifken gif görünüyor. README'de çalışıyor.
+
+## S17-T3
+Area: Docs
+Priority: critical
+Depends: S17-T2
+Description: README.md'yi sıfırdan yeniden yaz. Kullanıcının verdiği spec'e uygun: büyük başlık + one-liner, badges, hero/problem→solution, quick start + gif, feature highlights (emoji), Live/Plan comparison table, screenshots gallery, install options, plan mode kullanımı, CLI commands table, sharing/team, advanced features (context health / quality gates / worktrees), API table, stack, contributing + license. Tamamen İngilizce, kısa cümleler, bol whitespace, 120-200 satır, modern+profesyonel.
+AC: README.md sıfırdan yazılmış, tüm bölümler mevcut, fotoğraflar düzgün sıralanmış (live.png önce), activity.gif çalışıyor, mp4 yok.
+
+## S17-T4
+Area: CI
+Priority: high
+Depends: -
+Description: Versioning otomasyonunu düzelt. (1) auto-tag.yml workflow'una GitHub Release oluşturma adımı ekle: `gh release create v$VERSION --title "v$VERSION" --generate-notes`. (2) v1.1.18 için mevcut GitHub release yoksa oluştur. (3) package.json version ile git tag + npm publish + GitHub release üçlüsünün hep senkronda olmasını sağla.
+AC: `gh release list` → v1.1.18 release'i var ve npm ile eşleşiyor. Bundan sonra version bump → otomatik tag + npm publish + GitHub release.
+
+## S17-T5
+Area: Dashboard
+Priority: medium
+Depends: -
+Description: react-doctor çalıştır, skoru kontrol et. Yeni sorunlar varsa düzelt. Hedef ≥95 puan.
+AC: `npx -y react-doctor@latest .` skoru ≥95. Yeni error/warning yoksa DONE.
+
+# Slice S18 — README Screenshot Gallery
+
+## S18-T1
+Area: Docs
+Priority: high
+Depends: -
+Description: README.md screenshots bölümünü 2×3 HTML table grid'e çevir. Her screenshot için alt açıklama (sub caption). 6 ekran görüntüsü (live, queue, worktrees, activity, config, docs) 3 satır × 2 sütun layout. Daha görsel, daha profesyonel.
+AC: README.md screenshots section HTML table kullanıyor. 6 screenshot düzgün sıralı. Her cell'de açıklayıcı caption var. GitHub'da render ediliyor.
