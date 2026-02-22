@@ -322,9 +322,6 @@ export interface HookEvent {
   receivedAt: string;
 }
 
-export interface HookEventsResponse {
-  events: HookEvent[];
-}
 
 // Agent API types
 export interface AgentRecord {
