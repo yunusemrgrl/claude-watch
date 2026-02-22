@@ -18,7 +18,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { HealthResponse, UsageStats } from "@/types";
-import pkg from "../../../package.json";
+import pkg from "./../../../package.json";
 import { WorktreePanel } from "@/components/WorktreePanel";
 import { LiveView } from "@/views/LiveView";
 import { PlanView } from "@/views/PlanView";
@@ -30,7 +30,14 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { Tooltip } from "@/components/ui/tooltip";
 
-type ViewMode = "live" | "plan" | "worktrees" | "activity" | "insights" | "plans" | "claudemd";
+type ViewMode =
+  | "live"
+  | "plan"
+  | "worktrees"
+  | "activity"
+  | "insights"
+  | "plans"
+  | "claudemd";
 
 const NAV_TABS: {
   id: Exclude<ViewMode, "insights">;
@@ -91,7 +98,10 @@ function fmtNum(n: number): string {
 
 export default function Dashboard() {
   const [mode, setMode] = useState<ViewMode>("live");
-  const [availableModes, setAvailableModes] = useState({ live: false, plan: false });
+  const [availableModes, setAvailableModes] = useState({
+    live: false,
+    plan: false,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -99,7 +109,8 @@ export default function Dashboard() {
   const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
   const [showCheatsheet, setShowCheatsheet] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const { showDeniedBanner, dismissDeniedBanner, sseConnected } = useNotifications();
+  const { showDeniedBanner, dismissDeniedBanner, sseConnected } =
+    useNotifications();
 
   useKeyboardShortcuts({
     setMode,
@@ -115,8 +126,12 @@ export default function Dashboard() {
     const controller = new AbortController();
     fetch("/usage", { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: UsageStats | null) => { if (d) setUsageStats(d); })
-      .catch(() => { /* no data — widget stays hidden */ });
+      .then((d: UsageStats | null) => {
+        if (d) setUsageStats(d);
+      })
+      .catch(() => {
+        /* no data — widget stays hidden */
+      });
     return () => controller.abort();
   }, []);
 
@@ -141,11 +156,14 @@ export default function Dashboard() {
   const handleInsightsToggle = () => {
     setMode((prev) =>
       prev === "insights"
-        ? availableModes.live ? "live" : availableModes.plan ? "plan" : "activity"
-        : "insights"
+        ? availableModes.live
+          ? "live"
+          : availableModes.plan
+            ? "plan"
+            : "activity"
+        : "insights",
     );
   };
-
 
   if (loading) {
     return (
@@ -164,15 +182,19 @@ export default function Dashboard() {
   }
 
   // Top-bar widget tooltip content
-  const widgetTooltip = usageStats ? [
-    `${fmtNum(usageStats.totalMessages)} messages · ${fmtNum(usageStats.totalSessions)} sessions`,
-    usageStats.firstSessionDate
-      ? `Since ${new Date(usageStats.firstSessionDate).toLocaleDateString()}`
-      : null,
-    usageStats.lastComputedDate
-      ? `Stats date: ${usageStats.lastComputedDate}`
-      : null,
-  ].filter(Boolean).join(" · ") : "";
+  const widgetTooltip = usageStats
+    ? [
+        `${fmtNum(usageStats.totalMessages)} messages · ${fmtNum(usageStats.totalSessions)} sessions`,
+        usageStats.firstSessionDate
+          ? `Since ${new Date(usageStats.firstSessionDate).toLocaleDateString()}`
+          : null,
+        usageStats.lastComputedDate
+          ? `Stats date: ${usageStats.lastComputedDate}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
@@ -180,7 +202,8 @@ export default function Dashboard() {
       {showDeniedBanner && (
         <div className="bg-destructive/10 border-b border-destructive/30 px-4 py-2 flex items-center justify-between text-xs text-destructive shrink-0">
           <span>
-            Browser notifications are blocked. Enable them in your browser settings to get alerts when tasks fail or complete.
+            Browser notifications are blocked. Enable them in your browser
+            settings to get alerts when tasks fail or complete.
           </span>
           <button
             onClick={dismissDeniedBanner}
@@ -195,37 +218,50 @@ export default function Dashboard() {
       <div className="bg-sidebar border-b border-sidebar-border px-4 py-2 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
           {/* Sidebar toggle */}
-          <Tooltip content={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} side="bottom">
+          <Tooltip
+            content={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            side="bottom"
+          >
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
               className="p-1.5 rounded hover:bg-sidebar-accent transition-colors"
             >
-              {sidebarCollapsed ? <PanelLeft className="size-4" /> : <PanelLeftClose className="size-4" />}
+              {sidebarCollapsed ? (
+                <PanelLeft className="size-4" />
+              ) : (
+                <PanelLeftClose className="size-4" />
+              )}
             </button>
           </Tooltip>
 
           <div className="flex items-baseline gap-2">
-            <h1 className="text-lg font-semibold text-foreground">claudedash</h1>
-            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">v{pkg.version}</span>
+            <h1 className="text-lg font-semibold text-foreground">
+              claudedash
+            </h1>
+            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+              v{pkg.version}
+            </span>
           </div>
 
           {/* Main nav tabs */}
           <div className="flex items-center bg-muted rounded-lg p-0.5">
-            {NAV_TABS.filter((t) => t.show(availableModes)).map(({ id, icon: Icon, label, tooltip }) => (
-              <Tooltip key={id} content={tooltip} side="bottom">
-                <button
-                  onClick={() => setMode(id)}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors ${
-                    mode === id
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Icon className="size-3" />
-                  {label}
-                </button>
-              </Tooltip>
-            ))}
+            {NAV_TABS.filter((t) => t.show(availableModes)).map(
+              ({ id, icon: Icon, label, tooltip }) => (
+                <Tooltip key={id} content={tooltip} side="bottom">
+                  <button
+                    onClick={() => setMode(id)}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors ${
+                      mode === id
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Icon className="size-3" />
+                    {label}
+                  </button>
+                </Tooltip>
+              ),
+            )}
           </div>
         </div>
 
@@ -251,10 +287,14 @@ export default function Dashboard() {
                 className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/60 hover:bg-muted transition-colors text-xs text-muted-foreground cursor-pointer"
               >
                 <BarChart2 className="size-3 text-chart-1" />
-                <span className="font-medium text-foreground">{fmtNum(usageStats.totalMessages)}</span>
+                <span className="font-medium text-foreground">
+                  {fmtNum(usageStats.totalMessages)}
+                </span>
                 <span className="opacity-50">msgs</span>
                 <span className="opacity-30">·</span>
-                <span className="font-medium text-foreground">{fmtNum(usageStats.totalSessions)}</span>
+                <span className="font-medium text-foreground">
+                  {fmtNum(usageStats.totalSessions)}
+                </span>
                 <span className="opacity-50">sessions</span>
               </button>
             </Tooltip>
@@ -262,17 +302,28 @@ export default function Dashboard() {
 
           {/* SSE connection indicator */}
           <Tooltip
-            content={sseConnected ? "Live connection active · Server-Sent Events" : "Connecting to server…"}
+            content={
+              sseConnected
+                ? "Live connection active · Server-Sent Events"
+                : "Connecting to server…"
+            }
             side="bottom"
           >
             <div className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-muted-foreground cursor-default">
-              <span className={`size-2 rounded-full ${sseConnected ? "bg-chart-2 animate-pulse" : "bg-muted-foreground/40"}`} />
-              <span className="hidden sm:inline">{sseConnected ? "live" : "connecting"}</span>
+              <span
+                className={`size-2 rounded-full ${sseConnected ? "bg-chart-2 animate-pulse" : "bg-muted-foreground/40"}`}
+              />
+              <span className="hidden sm:inline">
+                {sseConnected ? "live" : "connecting"}
+              </span>
             </div>
           </Tooltip>
 
           {/* Insights lightbulb */}
-          <Tooltip content="Claude Code usage analytics · Run /insight to generate" side="bottom">
+          <Tooltip
+            content="Claude Code usage analytics · Run /insight to generate"
+            side="bottom"
+          >
             <button
               onClick={handleInsightsToggle}
               className={`p-1.5 rounded transition-colors ${
@@ -313,7 +364,9 @@ export default function Dashboard() {
           role="presentation"
           className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center"
           onClick={() => setShowCheatsheet(false)}
-          onKeyDown={(e) => { if (e.key === "Escape") setShowCheatsheet(false); }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setShowCheatsheet(false);
+          }}
         >
           <div
             role="dialog"
@@ -327,7 +380,10 @@ export default function Dashboard() {
               <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <Keyboard className="size-4" /> Keyboard Shortcuts
               </h2>
-              <button onClick={() => setShowCheatsheet(false)} className="text-muted-foreground hover:text-foreground">
+              <button
+                onClick={() => setShowCheatsheet(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
                 <X className="size-4" />
               </button>
             </div>
@@ -337,7 +393,11 @@ export default function Dashboard() {
                 ["Q", "Queue view", availableModes.plan],
                 ["A", "Activity view", true],
                 ["D", "Docs view", true],
-                ["W", "Worktrees view", availableModes.live || availableModes.plan],
+                [
+                  "W",
+                  "Worktrees view",
+                  availableModes.live || availableModes.plan,
+                ],
                 ["C", "Config (CLAUDE.md)", availableModes.plan],
                 ["/", "Focus search", true],
                 ["Esc", "Clear search / close", true],
@@ -345,8 +405,13 @@ export default function Dashboard() {
               ]
                 .filter(([, , show]) => show)
                 .map(([key, desc]) => (
-                  <div key={String(key)} className="flex items-center justify-between py-1 border-b border-border/40 last:border-0">
-                    <span className="text-muted-foreground">{String(desc)}</span>
+                  <div
+                    key={String(key)}
+                    className="flex items-center justify-between py-1 border-b border-border/40 last:border-0"
+                  >
+                    <span className="text-muted-foreground">
+                      {String(desc)}
+                    </span>
                     <kbd className="px-2 py-0.5 bg-muted rounded text-[10px] font-mono text-foreground border border-border">
                       {String(key)}
                     </kbd>
@@ -360,9 +425,15 @@ export default function Dashboard() {
       {/* Content */}
       <div className="flex-1 flex overflow-hidden">
         {mode === "live" ? (
-          <LiveView searchQuery={searchQuery} sidebarCollapsed={sidebarCollapsed} />
+          <LiveView
+            searchQuery={searchQuery}
+            sidebarCollapsed={sidebarCollapsed}
+          />
         ) : mode === "plan" ? (
-          <PlanView searchQuery={searchQuery} sidebarCollapsed={sidebarCollapsed} />
+          <PlanView
+            searchQuery={searchQuery}
+            sidebarCollapsed={sidebarCollapsed}
+          />
         ) : mode === "worktrees" ? (
           <WorktreePanel />
         ) : mode === "activity" ? (

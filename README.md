@@ -11,7 +11,7 @@
 
 ## The Problem
 
-You tell Claude Code: *"refactor the auth system."* It says: *"on it."*
+You tell Claude Code: _"refactor the auth system."_ It says: _"on it."_
 
 Terminal scrolls. Minutes pass. Is it on step 3 of 12? Stuck in a loop? Already done?
 
@@ -24,8 +24,6 @@ npx -y claudedash@latest start
 ```
 
 Open `localhost:4317`. Watch your agent work.
-
-![claudedash live demo](landing/assets/screenrecord.gif)
 
 ---
 
@@ -63,14 +61,14 @@ That's it. The dashboard auto-detects your Claude sessions.
 
 ## Live Mode vs Plan Mode
 
-| | **Live Mode** | **Plan Mode** |
-|---|---|---|
-| **What** | Watch Claude work in real time | Structured project execution |
-| **Source** | `~/.claude/tasks/` | `.claudedash/queue.md` |
-| **Setup** | None | `claudedash init` |
-| **Use when** | Visibility matters | Control matters |
-| **Deps / AC** | — | ✓ Full dependency graph |
-| **Execution log** | — | ✓ `execution.log` |
+|                   | **Live Mode**                  | **Plan Mode**                |
+| ----------------- | ------------------------------ | ---------------------------- |
+| **What**          | Watch Claude work in real time | Structured project execution |
+| **Source**        | `~/.claude/tasks/`             | `.claudedash/queue.md`       |
+| **Setup**         | None                           | `claudedash init`            |
+| **Use when**      | Visibility matters             | Control matters              |
+| **Deps / AC**     | —                              | ✓ Full dependency graph      |
+| **Execution log** | —                              | ✓ `execution.log`            |
 
 Live mode is on by default. Both modes can run simultaneously.
 
@@ -136,12 +134,12 @@ claudedash init
 
 This creates `.claudedash/` with:
 
-| File | Purpose |
-|---|---|
-| `queue.md` | Task list — slices, dependencies, acceptance criteria |
-| `workflow.md` | Execution protocol for your agent |
-| `execution.log` | Agent logs `DONE` / `FAILED` / `BLOCKED` here |
-| `CLAUDE.md` | Paste into your project's `CLAUDE.md` |
+| File            | Purpose                                               |
+| --------------- | ----------------------------------------------------- |
+| `queue.md`      | Task list — slices, dependencies, acceptance criteria |
+| `workflow.md`   | Execution protocol for your agent                     |
+| `execution.log` | Agent logs `DONE` / `FAILED` / `BLOCKED` here         |
+| `CLAUDE.md`     | Paste into your project's `CLAUDE.md`                 |
 
 **queue.md format:**
 
@@ -149,12 +147,14 @@ This creates `.claudedash/` with:
 # Slice S1
 
 ## S1-T1
+
 Area: Backend
 Depends: -
 Description: Setup database schema
 AC: Tables created, migrations run
 
 ## S1-T2
+
 Area: Backend
 Depends: S1-T1
 Description: Implement user auth
@@ -162,6 +162,7 @@ AC: Login and registration working
 ```
 
 Tell your agent:
+
 ```
 Follow .claudedash/workflow.md, start with S1-T1.
 ```
@@ -170,16 +171,16 @@ Follow .claudedash/workflow.md, start with S1-T1.
 
 ## CLI
 
-| Command | Description |
-|---|---|
-| `claudedash start` | Start dashboard (auto-detect modes) |
-| `claudedash start -p 3000` | Custom port |
-| `claudedash start --token <secret>` | Enable auth token |
-| `claudedash init` | Init plan mode in current directory |
-| `claudedash hooks install` | Install PostToolUse/Stop/PreCompact hooks |
-| `claudedash status` | Single-line terminal summary (no browser) |
-| `claudedash doctor` | Check setup: hooks, port, version, queue |
-| `claudedash recover` | Summarize last session after `/clear` |
+| Command                             | Description                               |
+| ----------------------------------- | ----------------------------------------- |
+| `claudedash start`                  | Start dashboard (auto-detect modes)       |
+| `claudedash start -p 3000`          | Custom port                               |
+| `claudedash start --token <secret>` | Enable auth token                         |
+| `claudedash init`                   | Init plan mode in current directory       |
+| `claudedash hooks install`          | Install PostToolUse/Stop/PreCompact hooks |
+| `claudedash status`                 | Single-line terminal summary (no browser) |
+| `claudedash doctor`                 | Check setup: hooks, port, version, queue  |
+| `claudedash recover`                | Summarize last session after `/clear`     |
 
 ---
 
@@ -198,6 +199,7 @@ CLAUDEDASH_TOKEN=mysecret123 claudedash start
 Team access: `http://your-host:4317?token=mysecret123`
 
 > **Tip:** Use a tunnel instead of exposing `--host 0.0.0.0`:
+>
 > ```bash
 > claudedash start --token $(openssl rand -hex 16)
 > ngrok http 4317
@@ -208,43 +210,49 @@ Team access: `http://your-host:4317?token=mysecret123`
 ## Advanced Features
 
 ### Context Health
+
 Color-coded token usage per session — green → yellow → red at 65% / 75%.
 → [Context Health docs](docs/context-health.md)
 
 ### Quality Gates
+
 Log `lint`, `typecheck`, `test` results per task via `meta.quality` in `execution.log`.
 See ✅/❌ inline in each card, with full timeline.
 → [Quality Gates docs](docs/quality-gates.md)
 
 ### Worktrees
+
 Running agents across multiple git branches? The Worktrees tab maps sessions to branches by `cwd`, shows dirty/ahead/behind state, and lists which tasks are running where. Native support for `claude --worktree <name>` (creates `.claude/worktrees/<name>/`).
 → [Worktree docs](docs/worktrees.md)
 
 ### MCP Server
+
 Claude can query its own dashboard:
+
 ```bash
 claude mcp add claudedash -- npx -y claudedash@latest mcp
 ```
+
 Tools: `get_queue`, `get_sessions`, `get_cost`, `get_history`, `log_task`, `create_task`, `register_agent`, `send_heartbeat`.
 
 ---
 
 ## API
 
-| Endpoint | Description |
-|---|---|
-| `GET /health` | Status, modes, connected clients |
-| `GET /sessions` | All sessions with context health |
-| `GET /sessions/:id/context` | Session JSONL summary |
-| `GET /events` | SSE stream |
-| `GET /snapshot` | Plan mode state |
-| `GET /queue` | Computed task statuses |
-| `GET /worktrees` | Git worktrees with task associations |
-| `GET /billing-block` | Current 5h billing window |
-| `GET /cost` | Estimated cost by model |
-| `POST /log` | Log task result |
-| `POST /plan/task` | Add task to queue.md |
-| `POST /agent/register` | Register an agent |
+| Endpoint                    | Description                          |
+| --------------------------- | ------------------------------------ |
+| `GET /health`               | Status, modes, connected clients     |
+| `GET /sessions`             | All sessions with context health     |
+| `GET /sessions/:id/context` | Session JSONL summary                |
+| `GET /events`               | SSE stream                           |
+| `GET /snapshot`             | Plan mode state                      |
+| `GET /queue`                | Computed task statuses               |
+| `GET /worktrees`            | Git worktrees with task associations |
+| `GET /billing-block`        | Current 5h billing window            |
+| `GET /cost`                 | Estimated cost by model              |
+| `POST /log`                 | Log task result                      |
+| `POST /plan/task`           | Add task to queue.md                 |
+| `POST /agent/register`      | Register an agent                    |
 
 ---
 
