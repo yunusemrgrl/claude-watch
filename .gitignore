@@ -6,9 +6,13 @@ dashboard/.next/
 coverage/
 .vitest-cache/
 *.log
-.claudedash/
 .DS_Store
 .env
+
+# claudedash runtime files (project-specific, not for repo)
+.claudedash/queue.md
+.claudedash/execution.log
+.claudedash/config.json
 
 # Internal documentation
 brief.md
@@ -24,4 +28,3 @@ docs/dev-log.md
 !landing/assets/*.png
 !landing/assets/*.gif
 !landing/assets/*.mp4
-.claudedash/execution.log
