@@ -71,6 +71,53 @@ td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #3f3f46; }
 tr:last-child td { border-bottom: none; }
 tr:hover td { background: #27272a; }
 img { max-width: 100%; border-radius: 6px; }
+
+/* ── Report class overrides for dark mode ─────────────────────────────── */
+/* Backgrounds */
+.narrative, .project-area, .chart-card, .feedback-card, .feature-code,
+.pattern-prompt, .copyable-prompt-section, .nav-toc { background: #27272a !important; border-color: #3f3f46 !important; }
+.at-a-glance { background: #2d2a1e !important; border-color: #78350f !important; }
+.big-win { background: #1a2e1a !important; border-color: #166534 !important; }
+.friction-category { background: #2e1a1a !important; border-color: #991b1b !important; }
+.key-insight { background: #1a2e1a !important; border-color: #166534 !important; }
+.horizon-card { background: #1e1a2e !important; border-color: #5b21b6 !important; }
+.claude-md-section { background: #1a1e2e !important; border-color: #1e40af !important; }
+.feature-card { background: #1a2e1a !important; border-color: #166534 !important; }
+.pattern-card { background: #1a2433 !important; border-color: #0369a1 !important; }
+.example-code, .copyable-prompt, .pattern-prompt code, .feature-code code,
+.cmd-code { background: #18181b !important; border-color: #3f3f46 !important; color: #e4e4e7 !important; }
+.nav-toc a { background: #3f3f46 !important; color: #a1a1aa !important; }
+.nav-toc a:hover { background: #52525b !important; color: #e4e4e7 !important; }
+.copy-btn, .copy-all-btn { background: #3f3f46 !important; color: #e4e4e7 !important; }
+.copy-all-btn:hover { background: #52525b !important; }
+.area-count { background: #3f3f46 !important; color: #a1a1aa !important; }
+.bar-track { background: #3f3f46 !important; }
+
+/* Text colors */
+.stat-value { color: #fafafa !important; }
+.stat-label { color: #a1a1aa !important; }
+.stats-row { border-color: #3f3f46 !important; }
+.area-name, .feature-title, .pattern-title, .big-win-title { color: #fafafa !important; }
+.glance-title { color: #fbbf24 !important; }
+.glance-section, .horizon-possible, .feature-oneliner, .pattern-summary,
+.area-desc, .friction-desc, .feature-why, .pattern-detail { color: #d4d4d8 !important; }
+.glance-section strong { color: #fbbf24 !important; }
+.see-more { color: #f59e0b !important; }
+.narrative p, .section-intro, .bar-label, .bar-value, .example-desc { color: #d4d4d8 !important; }
+.friction-title { color: #fca5a5 !important; }
+.friction-examples { color: #d4d4d8 !important; }
+.key-insight { color: #86efac !important; }
+.big-win-desc { color: #86efac !important; }
+.claude-md-section h3 { color: #93c5fd !important; }
+.cmd-why, .prompt-label, .chart-title { color: #a1a1aa !important; }
+.horizon-title { color: #c4b5fd !important; }
+.horizon-tip { background: rgba(0,0,0,0.3) !important; color: #c4b5fd !important; }
+.feature-example { border-color: #3f3f46 !important; }
+.claude-md-item { border-color: #3f3f46 !important; }
+.claude-md-actions { border-color: #3f3f46 !important; }
+.feedback-header, .feedback-section h3 { color: #a1a1aa !important; }
+.feedback-intro { color: #71717a !important; }
+.subtitle { color: #a1a1aa !important; }
 `;
 
 function injectTheme(html: string): string {
