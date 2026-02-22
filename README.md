@@ -3,7 +3,6 @@
 **See exactly what your AI agent is doing — in real time.**
 
 [![npm version](https://img.shields.io/npm/v/claudedash?color=00f5ff&labelColor=0f0f12)](https://www.npmjs.com/package/claudedash)
-[![npm downloads](https://img.shields.io/npm/dm/claudedash?labelColor=0f0f12)](https://www.npmjs.com/package/claudedash)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?labelColor=0f0f12)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/yunusemrgrl/claudedash/actions/workflows/ci.yml/badge.svg)](https://github.com/yunusemrgrl/claudedash/actions/workflows/ci.yml)
 
