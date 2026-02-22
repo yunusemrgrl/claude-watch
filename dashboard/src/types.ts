@@ -115,31 +115,6 @@ interface TimelineDataPoint {
   total: number;
 }
 
-export interface LiveInsights {
-  summary: {
-    totalSessions: number;
-    activeSessions: number;
-    totalTasks: number;
-    completedTasks: number;
-    inProgressTasks: number;
-    pendingTasks: number;
-  };
-  timeline: TimelineDataPoint[];
-  tokenUsage: {
-    total: number;
-    input: number;
-    output: number;
-    cacheCreation: number;
-    cacheRead: number;
-  };
-  topSessions: Array<{
-    id: string;
-    taskCount: number;
-    completedCount: number;
-    projectName?: string;
-    lastActivity: string;
-  }>;
-}
 
 // Quality Gates types
 export interface QualityChecks {
