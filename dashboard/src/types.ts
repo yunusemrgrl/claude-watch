@@ -115,36 +115,6 @@ interface TimelineDataPoint {
   total: number;
 }
 
-export interface PlanInsights {
-  summary: {
-    totalTasks: number;
-    completedTasks: number;
-    failedTasks: number;
-    blockedTasks: number;
-    successRate: number;
-    completionRate: number;
-  };
-  timeline: TimelineDataPoint[];
-  sliceStats: Record<string, {
-    name: string;
-    total: number;
-    completed: number;
-    failed: number;
-    blocked: number;
-    progress: number;
-  }>;
-  velocity: {
-    tasksPerHour: number;
-    tasksPerDay: number;
-    avgTaskDuration: number;
-  };
-  bottlenecks: Array<{
-    taskId: string;
-    blocksCount: number;
-    description: string;
-  }>;
-}
-
 export interface LiveInsights {
   summary: {
     totalSessions: number;
@@ -169,13 +139,6 @@ export interface LiveInsights {
     projectName?: string;
     lastActivity: string;
   }>;
-}
-
-export interface InsightsResponse {
-  mode: 'live' | 'plan' | 'both';
-  live?: LiveInsights;
-  plan?: PlanInsights;
-  generatedAt: string;
 }
 
 // Quality Gates types

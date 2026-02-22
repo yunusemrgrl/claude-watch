@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Lightbulb, Brain, RefreshCw } from "lucide-react";
 import { TypingPrompt } from "@/components/TypingPrompt";
 
@@ -135,14 +136,14 @@ export function InsightsView() {
             <RefreshCw className="size-3" />
             Refresh
           </button>
-          <a
+          <Link
             href="/claude-insights"
             target="_blank"
             rel="noreferrer"
             className="text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             Open in new tab →
-          </a>
+          </Link>
         </div>
       </div>
 

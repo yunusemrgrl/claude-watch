@@ -524,7 +524,6 @@ export function PlanView({
           {showAddForm ? (
             <div className="space-y-2">
               <textarea
-                autoFocus
                 value={newDesc}
                 onChange={(e) => setNewDesc(e.target.value)}
                 onKeyDown={(e) => {
