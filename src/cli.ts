@@ -5,7 +5,10 @@ import { mkdirSync, writeFileSync, existsSync, readdirSync, readFileSync, statSy
 import { join } from 'path';
 import { execFile } from 'child_process';
 import { startServer } from './server/server.js';
-import { captureContextSnapshot, writeContextSnapshot, readContextSnapshot, formatRecoveryOutput } from './core/contextCapture.js';
+import {
+  captureContextSnapshot, writeContextSnapshot, readContextSnapshot,
+  formatRecoveryOutput, listSnapshots, readSnapshotByHash, deleteSnapshot,
+} from './core/contextCapture.js';
 
 const program = new Command();
 
@@ -631,9 +634,13 @@ program
   .command('snapshot')
   .description('Save current project state to .claudedash/context-snapshot.json')
   .option('--focus <message>', 'Brief description of what was being worked on')
+  .option('--commit', 'Tag snapshot with the current git commit hash (auto-called by git post-commit hook)')
   .action(async (opts) => {
     try {
-      const snapshot = await captureContextSnapshot({ focus: opts.focus as string | undefined });
+      const snapshot = await captureContextSnapshot({
+        focus: opts.focus as string | undefined,
+        commit: !!opts.commit,
+      });
       const claudedashDir = join(process.cwd(), '.claudedash');
       writeContextSnapshot(snapshot, claudedashDir);
 
@@ -641,6 +648,9 @@ program
       console.log('\n✅ Context snapshot saved');
       console.log(`   Branch  : ${git.branch}${git.dirty ? ' (dirty)' : ''}`);
       console.log(`   Tasks   : ${tasks.summary.done}/${tasks.summary.total} done, ${tasks.summary.ready} ready`);
+      if (snapshot.commitHash) {
+        console.log(`   Commit  : ${snapshot.commitHash.slice(0, 8)}`);
+      }
       if (tasks.inProgress) {
         console.log(`   Next    : [${tasks.inProgress.id}] ${tasks.inProgress.description}`);
       }
@@ -655,12 +665,70 @@ program
   });
 
 program
-  .command('recover')
-  .description('Summarize the last Claude Code session after /clear')
-  .option('--claude-dir <path>', 'Path to Claude directory', join(process.env.HOME || '~', '.claude'))
-  .action((opts) => {
-    // Check for a saved context snapshot first
+  .command('snapshots [action] [hash]')
+  .description('Manage context snapshots (actions: list, delete <hash>)')
+  .action((action: string | undefined, hash: string | undefined) => {
     const claudedashDir = join(process.cwd(), '.claudedash');
+    const act = action ?? 'list';
+
+    if (act === 'list') {
+      const entries = listSnapshots(claudedashDir);
+      if (entries.length === 0) {
+        console.log('\n  No snapshots found. Run `claudedash snapshot --commit` after a git commit.\n');
+        return;
+      }
+      console.log('\n📸 Context Snapshots\n');
+      for (const e of entries) {
+        const hashLabel = e.commitHash ? `[${e.commitHash}]` : `[ts]`;
+        const date = e.capturedAt.slice(0, 16).replace('T', ' ');
+        const tasks = `${e.taskSummary.done}/${e.taskSummary.total} done`;
+        const focus = e.focus ? ` — ${e.focus}` : '';
+        console.log(`  ${hashLabel}  ${date}  ${e.branch}  ${tasks}${focus}`);
+        if (e.commitHash) {
+          console.log(`         ↳ recover: claudedash recover ${e.commitHash}`);
+        }
+      }
+      console.log('');
+      return;
+    }
+
+    if (act === 'delete') {
+      if (!hash) { console.error('Usage: claudedash snapshots delete <hash>'); process.exit(1); }
+      const ok = deleteSnapshot(claudedashDir, hash);
+      if (ok) {
+        console.log(`✓ Snapshot ${hash} deleted.`);
+      } else {
+        console.error(`❌ No snapshot found matching: ${hash}`);
+        process.exit(1);
+      }
+      return;
+    }
+
+    console.error(`Unknown action: ${act}. Use list or delete.`);
+    process.exit(1);
+  });
+
+program
+  .command('recover [hash]')
+  .description('Summarize the last Claude Code session after /clear. Pass a commit hash to recover a specific snapshot.')
+  .option('--claude-dir <path>', 'Path to Claude directory', join(process.env.HOME || '~', '.claude'))
+  .action((hash: string | undefined, opts) => {
+    const claudedashDir = join(process.cwd(), '.claudedash');
+
+    // If hash provided, load that specific snapshot
+    if (hash) {
+      const snap = readSnapshotByHash(claudedashDir, hash);
+      if (!snap) {
+        console.error(`❌ No snapshot found for: ${hash}`);
+        console.error(`   Run \`claudedash snapshots list\` to see available snapshots.`);
+        process.exit(1);
+      }
+      console.log(formatRecoveryOutput(snap));
+      console.log(`\n💡 To roll back:\n   git reset --hard ${hash}\n   claudedash recover ${hash}\n`);
+      return;
+    }
+
+    // Check for a saved context snapshot first
     const snapshot = readContextSnapshot(claudedashDir);
     if (snapshot) {
       console.log(formatRecoveryOutput(snapshot));
@@ -894,10 +962,17 @@ program
   .description('Manage Claude Code hooks integration (actions: install, status, uninstall)')
   .option('--port <port>', 'claudedash server port', '4317')
   .option('--all', 'Also install PreCompact + PostCompact hooks for context persistence')
-  .action((action: string, opts: { port: string; all?: boolean }) => {
+  .option('--git', 'Also install git post-commit hook for auto-snapshot on every commit')
+  .action((action: string, opts: { port: string; all?: boolean; git?: boolean }) => {
     const port = opts.port;
     const installAll = !!opts.all;
+    const installGit = !!opts.git;
     const settingsPath = join(process.env.HOME ?? '~', '.claude', 'settings.json');
+    const gitHookPath = join(process.cwd(), '.git', 'hooks', 'post-commit');
+    const gitHookMarker = 'claudedash snapshot --commit';
+
+    const hasGitHook = () => existsSync(gitHookPath) &&
+      readFileSync(gitHookPath, 'utf-8').includes(gitHookMarker);
 
     if (action === 'status') {
       if (!existsSync(settingsPath)) {
@@ -911,15 +986,19 @@ program
         typeof h === 'object' && (JSON.stringify(h).includes('claudedash') || JSON.stringify(h).includes(`${port}/hook`))
       );
       console.log(`\nclaudedash hooks status (port ${port}):\n`);
-      console.log(`  PostToolUse:  ${hasHook('PostToolUse') ? '\x1b[32m✓ installed\x1b[0m' : '\x1b[31m✗ not installed\x1b[0m'}`);
-      console.log(`  Stop:         ${hasHook('Stop') ? '\x1b[32m✓ installed\x1b[0m' : '\x1b[31m✗ not installed\x1b[0m'}`);
-      console.log(`  PreCompact:   ${hasHook('PreCompact') ? '\x1b[32m✓ installed\x1b[0m' : '\x1b[33m- not installed\x1b[0m'}`);
-      console.log(`  PostCompact:  ${hasHook('PostCompact') ? '\x1b[32m✓ installed\x1b[0m' : '\x1b[33m- not installed\x1b[0m'}`);
+      console.log(`  PostToolUse:   ${hasHook('PostToolUse') ? '\x1b[32m✓ installed\x1b[0m' : '\x1b[31m✗ not installed\x1b[0m'}`);
+      console.log(`  Stop:          ${hasHook('Stop') ? '\x1b[32m✓ installed\x1b[0m' : '\x1b[31m✗ not installed\x1b[0m'}`);
+      console.log(`  PreCompact:    ${hasHook('PreCompact') ? '\x1b[32m✓ installed\x1b[0m' : '\x1b[33m- not installed\x1b[0m'}`);
+      console.log(`  PostCompact:   ${hasHook('PostCompact') ? '\x1b[32m✓ installed\x1b[0m' : '\x1b[33m- not installed\x1b[0m'}`);
+      console.log(`  git post-commit: ${hasGitHook() ? '\x1b[32m✓ installed\x1b[0m' : '\x1b[33m- not installed\x1b[0m'}`);
       if (!hasHook('PostToolUse') || !hasHook('Stop')) {
         console.log(`\nRun \x1b[36mnpx claudedash hooks install\x1b[0m to enable real-time tool event streaming.`);
       }
       if (!hasHook('PreCompact') || !hasHook('PostCompact')) {
-        console.log(`Run \x1b[36mnpx claudedash hooks install --all\x1b[0m to also enable context compaction state.\n`);
+        console.log(`Run \x1b[36mnpx claudedash hooks install --all\x1b[0m to also enable context compaction state.`);
+      }
+      if (!hasGitHook()) {
+        console.log(`Run \x1b[36mnpx claudedash hooks install --git\x1b[0m to auto-snapshot on every git commit.\n`);
       } else {
         console.log('');
       }
@@ -962,6 +1041,27 @@ program
         console.log(`  PreCompact  → POST http://localhost:${port}/hook`);
         console.log(`  PostCompact → POST http://localhost:${port}/hook`);
       }
+
+      // Install git post-commit hook
+      if (installGit) {
+        const gitHooksDir = join(process.cwd(), '.git', 'hooks');
+        if (!existsSync(join(process.cwd(), '.git'))) {
+          console.log(`\n\x1b[33m⚠ No .git directory found — skipping git post-commit hook.\x1b[0m`);
+        } else {
+          mkdirSync(gitHooksDir, { recursive: true });
+          const hookContent = existsSync(gitHookPath)
+            ? readFileSync(gitHookPath, 'utf-8')
+            : '#!/bin/sh\n';
+          if (!hookContent.includes(gitHookMarker)) {
+            const newContent = hookContent.trimEnd() + `\n\n# claudedash: auto-snapshot on commit\nclaudedash snapshot --commit 2>/dev/null || true\n`;
+            writeFileSync(gitHookPath, newContent, { mode: 0o755 });
+            console.log(`  git post-commit → claudedash snapshot --commit`);
+          } else {
+            console.log(`  git post-commit → already installed`);
+          }
+        }
+      }
+
       console.log(`\nStart claudedash and run a Claude Code session to see real-time tool events.\n`);
       return;
     }
@@ -981,6 +1081,19 @@ program
       if (Array.isArray(hooks.PostCompact)) hooks.PostCompact = filterHook(hooks.PostCompact);
       settings.hooks = hooks;
       writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
+
+      // Remove git hook entry if present
+      if (existsSync(gitHookPath)) {
+        const content = readFileSync(gitHookPath, 'utf-8');
+        if (content.includes(gitHookMarker)) {
+          const cleaned = content
+            .replace(/\n# claudedash: auto-snapshot on commit\nclaudedash snapshot --commit 2>\/dev\/null \|\| true\n/g, '\n')
+            .trimEnd() + '\n';
+          writeFileSync(gitHookPath, cleaned, { mode: 0o755 });
+          console.log(`\n\x1b[32m✓ claudedash hooks removed\x1b[0m from ~/.claude/settings.json and .git/hooks/post-commit\n`);
+          return;
+        }
+      }
       console.log(`\n\x1b[32m✓ claudedash hooks removed\x1b[0m from ~/.claude/settings.json\n`);
       return;
     }

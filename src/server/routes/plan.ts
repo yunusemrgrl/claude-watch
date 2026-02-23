@@ -8,6 +8,7 @@ import { computeSnapshot } from '../../core/stateEngine.js';
 import { computePlanInsights, computeLiveInsights } from '../../core/insightsEngine.js';
 import { readSessions } from '../../core/todoReader.js';
 import { parseQualityTimeline } from '../../core/qualityTimeline.js';
+import { listSnapshots, readSnapshotByHash, deleteSnapshot } from '../../core/contextCapture.js';
 import type { Snapshot, InsightsResponse } from '../../core/types.js';
 
 export interface PlanRouteOptions {
@@ -423,6 +424,29 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
       return { ok: true, path: targetPath };
     }
   );
+
+  // GET /snapshots — list all context snapshots with metadata
+  fastify.get('/snapshots', async (_request, reply) => {
+    if (!planDir) return reply.code(404).send({ error: 'Plan mode not configured' });
+    const entries = listSnapshots(planDir);
+    return { snapshots: entries };
+  });
+
+  // GET /snapshots/:hash — get a specific snapshot by commit hash
+  fastify.get<{ Params: { hash: string } }>('/snapshots/:hash', async (request, reply) => {
+    if (!planDir) return reply.code(404).send({ error: 'Plan mode not configured' });
+    const snap = readSnapshotByHash(planDir, request.params.hash);
+    if (!snap) return reply.code(404).send({ error: 'Snapshot not found' });
+    return snap;
+  });
+
+  // DELETE /snapshots/:hash — delete a snapshot
+  fastify.delete<{ Params: { hash: string } }>('/snapshots/:hash', async (request, reply) => {
+    if (!planDir) return reply.code(404).send({ error: 'Plan mode not configured' });
+    const ok = deleteSnapshot(planDir, request.params.hash);
+    if (!ok) return reply.code(404).send({ error: 'Snapshot not found' });
+    return { ok: true };
+  });
 
   fastify.get('/claude-insights', async (_request, reply) => {
     const reportPath = join(claudeDir, 'usage-data', 'report.html');

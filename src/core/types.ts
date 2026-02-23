@@ -182,6 +182,7 @@ export interface ContextSnapshot {
   capturedAt: string;       // ISO timestamp
   cwd: string;
   focus?: string;           // Optional --focus message
+  commitHash?: string;      // Git commit hash when snapshotted (--commit flag)
   git: {
     branch: string;
     dirty: boolean;

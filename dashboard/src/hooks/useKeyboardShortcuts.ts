@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback } from "react";
 
-type ViewMode = "live" | "plan" | "worktrees" | "activity" | "insights" | "plans" | "claudemd";
+type ViewMode = "live" | "plan" | "worktrees" | "activity" | "insights" | "plans" | "claudemd" | "snapshots";
 
 interface UseKeyboardShortcutsOptions {
   setMode: (mode: ViewMode) => void;

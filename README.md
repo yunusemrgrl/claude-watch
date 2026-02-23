@@ -179,9 +179,13 @@ Follow .claudedash/workflow.md, start with S1-T1.
 | `claudedash start --token <secret>` | Enable auth token                         |
 | `claudedash init`                   | Init plan mode in current directory       |
 | `claudedash hooks install`          | Install PostToolUse/Stop/PreCompact hooks |
+| `claudedash hooks install --git`    | Also install git post-commit auto-snapshot |
 | `claudedash status`                 | Single-line terminal summary (no browser) |
 | `claudedash doctor`                 | Check setup: hooks, port, version, queue  |
+| `claudedash snapshot --commit`      | Save context snapshot tagged to HEAD commit |
+| `claudedash snapshots list`         | List all saved snapshots                  |
 | `claudedash recover`                | Summarize last session after `/clear`     |
+| `claudedash recover <hash>`         | Recover context from a specific commit    |
 
 ---
 
@@ -226,6 +230,25 @@ See ✅/❌ inline in each card, with full timeline.
 Running agents across multiple git branches? The Worktrees tab maps sessions to branches by `cwd`, shows dirty/ahead/behind state, and lists which tasks are running where. Native support for `claude --worktree <name>` (creates `.claude/worktrees/<name>/`).
 → [Worktree docs](docs/worktrees.md)
 
+### Context Rollback
+
+Something broke during vibe coding? Roll back your code **and** your Claude context together.
+
+```bash
+# 1. Auto-snapshot on every commit (one-time setup)
+claudedash hooks install --git
+
+# 2. When something breaks, find the last good commit
+claudedash snapshots list
+# [abc1234f]  Feb 23 14:02  main  12/15 done
+
+# 3. Roll back code + context in two commands
+git reset --hard abc1234f
+claudedash recover abc1234f
+```
+
+The Snapshots tab in the dashboard shows all checkpoints with a one-click "Copy rollback" button.
+
 ### MCP Server
 
 Claude can query its own dashboard:
@@ -249,6 +272,9 @@ Tools: `get_queue`, `get_sessions`, `get_cost`, `get_history`, `log_task`, `crea
 | `GET /snapshot`             | Plan mode state                      |
 | `GET /queue`                | Computed task statuses               |
 | `GET /worktrees`            | Git worktrees with task associations |
+| `GET /snapshots`            | List all context snapshots           |
+| `GET /snapshots/:hash`      | Get snapshot by commit hash          |
+| `DELETE /snapshots/:hash`   | Delete a snapshot                    |
 | `GET /billing-block`        | Current 5h billing window            |
 | `GET /cost`                 | Estimated cost by model              |
 | `POST /log`                 | Log task result                      |

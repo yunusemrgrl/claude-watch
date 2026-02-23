@@ -1,5 +1,5 @@
 import { execFileSync } from 'child_process';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import type { ContextSnapshot } from './types.js';
 import { parseQueue } from './queueParser.js';
@@ -29,7 +29,7 @@ function captureGit(cwd: string): ContextSnapshot['git'] {
 }
 
 export async function captureContextSnapshot(
-  opts: { focus?: string; cwd?: string } = {}
+  opts: { focus?: string; cwd?: string; commit?: boolean } = {}
 ): Promise<ContextSnapshot> {
   const cwd = opts.cwd ?? process.cwd();
   const claudedashDir = join(cwd, '.claudedash');
@@ -37,6 +37,9 @@ export async function captureContextSnapshot(
   const logPath = join(claudedashDir, 'execution.log');
 
   const git = captureGit(cwd);
+  const commitHash = opts.commit
+    ? (safeExec('git', ['rev-parse', 'HEAD'], cwd) || undefined)
+    : undefined;
 
   // Read raw log lines for chronological tail (parseLog deduplicates, we want order here)
   const lastEntries: ContextSnapshot['execution']['lastEntries'] = [];
@@ -83,6 +86,7 @@ export async function captureContextSnapshot(
     capturedAt: new Date().toISOString(),
     cwd,
     ...(opts.focus ? { focus: opts.focus } : {}),
+    ...(commitHash ? { commitHash } : {}),
     git,
     tasks: {
       inProgress,
@@ -114,9 +118,84 @@ export function writeContextSnapshot(snapshot: ContextSnapshot, claudedashDir: s
   const json = JSON.stringify(snapshot, null, 2);
   writeFileSync(join(claudedashDir, 'context-snapshot.json'), json, 'utf-8');
 
-  // Timestamped archive
-  const ts = snapshot.capturedAt.replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
-  writeFileSync(join(snapshotsDir, `${ts}.json`), json, 'utf-8');
+  // Commit-hash named snapshot (primary for rollback)
+  if (snapshot.commitHash) {
+    writeFileSync(join(snapshotsDir, `${snapshot.commitHash}.json`), json, 'utf-8');
+  } else {
+    // Timestamped archive fallback
+    const ts = snapshot.capturedAt.replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
+    writeFileSync(join(snapshotsDir, `${ts}.json`), json, 'utf-8');
+  }
+}
+
+export interface SnapshotEntry {
+  filename: string;
+  commitHash?: string;        // short hash for display
+  capturedAt: string;
+  branch: string;
+  taskSummary: { total: number; done: number; ready: number };
+  focus?: string;
+}
+
+export function listSnapshots(claudedashDir: string): SnapshotEntry[] {
+  const snapshotsDir = join(claudedashDir, 'snapshots');
+  if (!existsSync(snapshotsDir)) return [];
+
+  const files = readdirSync(snapshotsDir)
+    .filter(f => f.endsWith('.json'))
+    .sort()
+    .reverse(); // newest first
+
+  const entries: SnapshotEntry[] = [];
+  for (const file of files) {
+    try {
+      const raw = readFileSync(join(snapshotsDir, file), 'utf-8');
+      const snap = JSON.parse(raw) as ContextSnapshot;
+      entries.push({
+        filename: file,
+        commitHash: snap.commitHash ? snap.commitHash.slice(0, 8) : undefined,
+        capturedAt: snap.capturedAt,
+        branch: snap.git.branch,
+        taskSummary: {
+          total: snap.tasks.summary.total,
+          done: snap.tasks.summary.done,
+          ready: snap.tasks.summary.ready,
+        },
+        focus: snap.focus,
+      });
+    } catch { /* skip malformed */ }
+  }
+  return entries;
+}
+
+export function readSnapshotByHash(claudedashDir: string, hash: string): ContextSnapshot | null {
+  const snapshotsDir = join(claudedashDir, 'snapshots');
+  if (!existsSync(snapshotsDir)) return null;
+
+  // Try exact match first (full or short hash)
+  const files = existsSync(snapshotsDir) ? readdirSync(snapshotsDir) : [];
+  const match = files.find(f => f.startsWith(hash) && f.endsWith('.json'));
+  if (!match) return null;
+
+  try {
+    return JSON.parse(readFileSync(join(snapshotsDir, match), 'utf-8')) as ContextSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+export function deleteSnapshot(claudedashDir: string, hash: string): boolean {
+  const snapshotsDir = join(claudedashDir, 'snapshots');
+  if (!existsSync(snapshotsDir)) return false;
+  const files = readdirSync(snapshotsDir);
+  const match = files.find(f => f.startsWith(hash) && f.endsWith('.json'));
+  if (!match) return false;
+  try {
+    unlinkSync(join(snapshotsDir, match));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function readContextSnapshot(claudedashDir: string): ContextSnapshot | null {

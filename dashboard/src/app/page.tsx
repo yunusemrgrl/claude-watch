@@ -15,6 +15,7 @@ import {
   Settings,
   Keyboard,
   X,
+  Camera,
   type LucideIcon,
 } from "lucide-react";
 import type { HealthResponse, UsageStats } from "@/types";
@@ -26,6 +27,7 @@ import { InsightsView } from "@/views/InsightsView";
 import { ActivityView } from "@/views/ActivityView";
 import { PlansLibraryView } from "@/views/PlansLibraryView";
 import { ClaudeMdView } from "@/views/ClaudeMdView";
+import { SnapshotsView } from "@/views/SnapshotsView";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -37,7 +39,8 @@ type ViewMode =
   | "activity"
   | "insights"
   | "plans"
-  | "claudemd";
+  | "claudemd"
+  | "snapshots";
 
 const NAV_TABS: {
   id: Exclude<ViewMode, "insights">;
@@ -86,6 +89,13 @@ const NAV_TABS: {
     icon: Settings,
     label: "Config",
     tooltip: "Edit CLAUDE.md agent instruction files",
+    show: (m) => m.plan,
+  },
+  {
+    id: "snapshots",
+    icon: Camera,
+    label: "Snapshots",
+    tooltip: "Context snapshots — roll back code and Claude context together",
     show: (m) => m.plan,
   },
 ];
@@ -442,6 +452,8 @@ export default function Dashboard() {
           <PlansLibraryView />
         ) : mode === "claudemd" ? (
           <ClaudeMdView />
+        ) : mode === "snapshots" ? (
+          <SnapshotsView />
         ) : (
           <InsightsView />
         )}
