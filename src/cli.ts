@@ -872,7 +872,8 @@ program
   .command('upgrade')
   .description('Upgrade claudedash to the latest version')
   .action(() => {
-    const current = '1.1.27';
+    const pkgPath = new URL('../package.json', import.meta.url).pathname;
+    const current = (JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string }).version;
     console.log(`\nclaudedash v${current} → checking for updates...\n`);
 
     execFile('npm', ['show', 'claudedash', 'version'], (err, stdout) => {
