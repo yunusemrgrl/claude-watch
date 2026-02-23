@@ -1,6 +1,6 @@
 # claudedash Launch Campaign
 
-> v1.1.21 · 162 commits · MIT · [github.com/yunusemrgrl/claudedash](https://github.com/yunusemrgrl/claudedash)
+> v1.1.22 · 180 commits · MIT · [github.com/yunusemrgrl/claudedash](https://github.com/yunusemrgrl/claudedash)
 
 ---
 
@@ -166,7 +166,7 @@ The loop closes.
 
 **Tweet 10/10**
 ```
-162 commits. Built in public. v1.1.21 dropped today.
+180 commits. Built in public. v1.1.22 dropped today.
 
 If you use Claude Code and don't have this open,
 you're flying blind.
@@ -877,6 +877,8 @@ subtle grid lines in background --ar 4:1 --v 6
 
 **Title:** `Show HN: claudedash – real-time local dashboard for Claude Code agents`
 
+> Title length: 70 chars (HN limit: 80) ✓
+
 ```
 Hi HN,
 
@@ -909,12 +911,37 @@ The context health feature was trickier than expected — the naive approach
 of summing all input_tokens gives wildly wrong numbers. The correct approach
 is using only the last message's token counts.
 
-162 commits, MIT license.
+180 commits, MIT license.
 
 GitHub: https://github.com/yunusemrgrl/claudedash
 
 Happy to answer questions about the implementation or design decisions.
 ```
+
+### Posting Checklist
+
+- [ ] Account has ≥ 10 karma (required to show on /newest)
+- [ ] Pick timing: **Tuesday or Wednesday, 09:00–11:00 ET** (peak HN front page window)
+- [ ] Do NOT submit on weekends or Monday
+- [ ] Log in, go to `news.ycombinator.com/submit`
+- [ ] URL: `https://github.com/yunusemrgrl/claudedash`
+- [ ] Title: exactly as above (copy-paste)
+- [ ] DO NOT add text to the URL submission box — put body in first comment
+- [ ] Post the body text (above) as the FIRST COMMENT immediately after submitting
+- [ ] Stay online for first 2 hours to reply to early questions
+- [ ] Reply to every comment within the first hour
+
+### Likely HN Questions & Answers
+
+| Question | Answer |
+|----------|--------|
+| "How is this different from ccusage?" | ccusage tracks costs per model. claudedash tracks task state, context health, worktrees, and plan execution — operational observability, not billing analytics. |
+| "Does this work with Claude Desktop?" | No — it's for Claude Code (CLI). Claude Desktop doesn't write JSONL task files to `~/.claude/tasks/`. |
+| "Why port 4317?" | OpenTelemetry default port — felt appropriate for an observability tool. Configurable with `--port`. |
+| "Windows support?" | Yes, Node.js cross-platform. Tested on macOS/Linux primarily. |
+| "Can I run this remotely / expose it to my team?" | Not yet. `--share` flag (ngrok tunnel) is on the roadmap. |
+| "What model versions are supported?" | Any model Claude Code uses. Context window size is fetched from the model config in the JSONL files. |
+| "Does this slow down agents?" | No. It only reads files that Claude Code already writes. Zero writes to agent directories. |
 
 ---
 
@@ -934,6 +961,108 @@ If context health > 75%, compact immediately before proceeding.
 
 After completing tasks, verify they appear as DONE in the dashboard.
 ```
+
+---
+
+## Product Hunt
+
+**Tagline** (max 60 chars):
+```
+Real-time dashboard for Claude Code agents — one command
+```
+> 57 chars ✓
+
+**Description** (max 260 chars for gallery caption):
+```
+Zero-config observability for Claude Code. Live Kanban, context health %, per-worktree agent status, plan execution graph, MCP self-query. No telemetry. No cloud. Just: npx -y claudedash@latest start
+```
+
+**Full Description** (product page body):
+```
+claudedash is a local real-time dashboard for Claude Code agents.
+
+If you're running AI coding agents autonomously — overnight runs, parallel
+worktrees, multi-task sprints — you know the problem: zero visibility.
+You don't know which task is stuck. You don't know how close to context
+overflow each session is. You find out after.
+
+claudedash solves this with one command:
+
+  npx -y claudedash@latest start
+
+Opens localhost:4317 in under 5 seconds. Passively reads the files Claude
+Code already writes. Zero agents modified. Zero telemetry.
+
+WHAT YOU GET:
+→ Live Kanban — every task, every state, real-time
+→ Context Health — live % per session (65% warn, 75% critical)
+→ Worktree View — all branches, all agents, one screen
+→ Plan Mode — queue.md + dependency graph + execution log
+→ MCP Server — Claude can query its own dashboard
+→ Cost Tracker — 5-hour billing block monitoring
+→ Hook Events — PreToolUse/PostToolUse log
+
+WHY IT'S DIFFERENT:
+No database. No API key. No config file. No cloud sync.
+Pure filesystem watcher (chokidar) + SSE + Next.js static export.
+Everything runs on your machine. Everything stays on your machine.
+
+180 commits. MIT license. Open source.
+```
+
+### Gallery Images (in order)
+
+1. `hero-dashboard.png` — Full live dashboard with Kanban
+2. `context-health.png` — Context health widget closeup
+3. `worktrees.png` — Multi-branch worktree panel
+4. `kanban.png` — Kanban task cards
+5. `queue.png` — Plan mode dependency graph
+6. `terminal-start.gif` — Cold start demo (animated)
+
+### First Comment (post immediately after launch goes live)
+
+```
+Hey PH! Builder here.
+
+Quick context: I built this because I was running 4 Claude Code agents
+in parallel and had zero visibility. Cat-ing JSON files at 2am to figure
+out which agent was stuck got old fast.
+
+The feature most users mention first is Context Health — seeing the live
+% of context window used, with 65%/75% thresholds, so you know when your
+agent is about to degrade. It sounds simple but it changes how you work.
+
+Technical note for the curious: the naive approach (summing all input_tokens
+across the session) gives wildly wrong numbers. The correct approach is
+using only the LAST message's token counts. That was a fun 3am debugging
+session.
+
+Happy to answer any questions about the implementation, design decisions,
+or Claude Code workflows in general.
+
+GitHub: https://github.com/yunusemrgrl/claudedash
+```
+
+### Posting Checklist
+
+- [ ] Create account at producthunt.com (if not existing)
+- [ ] Profile: real photo, filled bio, linked Twitter/GitHub
+- [ ] Pick launch day: **Tuesday** (highest traffic) or **Wednesday**
+- [ ] Submit at **00:01 PST** to maximize 24-hour window
+- [ ] Notify existing GitHub stargazers the day before
+- [ ] Ask 5–10 genuine users to upvote on launch day (no coordinated voting rings)
+- [ ] Post on Twitter/X announcing the PH launch on launch morning
+- [ ] Stay online all day to reply to comments
+- [ ] Reply to EVERY comment within 2 hours
+
+### Categories
+
+Primary: `Developer Tools`
+Secondary: `Artificial Intelligence`, `Open Source`
+
+### Maker Tags
+
+`open-source`, `cli`, `devtools`, `claude`, `ai-agents`, `observability`
 
 ---
 
@@ -963,4 +1092,4 @@ github.com/yunusemrgrl/claudedash
 
 ---
 
-*Generated for claudedash v1.1.21 launch · February 2026*
+*Updated for claudedash v1.1.22 · February 2026*
