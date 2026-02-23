@@ -1,11 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { existsSync, readFileSync, writeFileSync, appendFileSync, readdirSync } from 'fs';
 import { join } from 'path';
+import { execFileSync } from 'child_process';
 import { readSessions } from '../../core/todoReader.js';
 import { buildContextHealth } from '../../core/contextHealth.js';
 import { parseQueue } from '../../core/queueParser.js';
 import { parseLog } from '../../core/logParser.js';
 import { computeSnapshot } from '../../core/stateEngine.js';
+import { captureContextSnapshot, writeContextSnapshot } from '../../core/contextCapture.js';
 import type { WatchEvent } from '../watcher.js';
 import type { EventEmitter } from 'events';
 
@@ -285,26 +287,50 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
     if (hookEvents.length > 100) hookEvents.shift();
     for (const send of sseClients) send(hookEvent);
 
-    // PreCompact: save task state to compact-state.json
-    if (hookEvent.event === 'PreCompact' && planDir) {
+    // PreCompact: save task state + context snapshot + auto-commit
+    if (hookEvent.event === 'PreCompact') {
+      const snapshotCwd = (hookEvent.cwd as string | undefined) ?? (planDir ? join(planDir, '..') : process.cwd());
+      const snapshotDir = planDir ?? join(snapshotCwd, '.claudedash');
+
+      // 1. Auto git commit (non-fatal — silently skipped if nothing to commit)
+      let commitMade = false;
       try {
-        const queuePath = join(planDir, 'queue.md');
-        const logPath = join(planDir, 'execution.log');
-        if (existsSync(queuePath)) {
-          const queueResult = parseQueue(readFileSync(queuePath, 'utf-8'));
-          let logResult = parseLog('');
-          if (existsSync(logPath)) logResult = parseLog(readFileSync(logPath, 'utf-8'));
-          const snapshot = computeSnapshot(queueResult.tasks, logResult.events);
-          const readyTasks = snapshot.tasks.filter(t => t.status === 'READY').map(t => t.id);
-          const state = {
-            compactedAt: hookEvent.receivedAt,
-            sessionId: hookEvent.session ?? null,
-            summary: snapshot.summary,
-            readyTasks,
-          };
-          writeFileSync(join(planDir, 'compact-state.json'), JSON.stringify(state, null, 2), 'utf-8');
-        }
+        execFileSync('git', ['add', '-A'], { cwd: snapshotCwd, stdio: 'ignore' });
+        execFileSync('git', ['commit', '-m', 'chore: pre-compact auto-save [claudedash]'], { cwd: snapshotCwd, stdio: 'ignore' });
+        commitMade = true;
+      } catch { /* nothing to commit or not a git repo */ }
+
+      // 2. Context snapshot (commit-tied if we just committed, else timestamped)
+      try {
+        const ctxSnap = await captureContextSnapshot({
+          focus: 'pre-compact auto-save',
+          cwd: snapshotCwd,
+          commit: commitMade,
+        });
+        writeContextSnapshot(ctxSnap, snapshotDir);
       } catch { /* non-fatal */ }
+
+      // 3. compact-state.json for PostCompact restore
+      if (planDir) {
+        try {
+          const queuePath = join(planDir, 'queue.md');
+          const logPath = join(planDir, 'execution.log');
+          if (existsSync(queuePath)) {
+            const queueResult = parseQueue(readFileSync(queuePath, 'utf-8'));
+            let logResult = parseLog('');
+            if (existsSync(logPath)) logResult = parseLog(readFileSync(logPath, 'utf-8'));
+            const stateSnap = computeSnapshot(queueResult.tasks, logResult.events);
+            const readyTasks = stateSnap.tasks.filter(t => t.status === 'READY').map(t => t.id);
+            const state = {
+              compactedAt: hookEvent.receivedAt,
+              sessionId: hookEvent.session ?? null,
+              summary: stateSnap.summary,
+              readyTasks,
+            };
+            writeFileSync(join(planDir, 'compact-state.json'), JSON.stringify(state, null, 2), 'utf-8');
+          }
+        } catch { /* non-fatal */ }
+      }
     }
 
     // PostCompact: append restore reminder to CLAUDE.md
