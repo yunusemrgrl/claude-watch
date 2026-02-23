@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useSSEEvents } from "@/hooks/useSSEEvents";
 import { BarChart2, Zap, MessageSquare, GitCommit, Clock, RefreshCw, ChevronDown, ChevronRight, DollarSign, Wrench, Award, History, Zap as ZapIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type {
@@ -697,8 +698,10 @@ export function ActivityView() {
   const [error, setError] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "quality" | "tools" | "history" | "hooks">("overview");
 
-  const load = async () => {
-    setLoading(true);
+  const loadRef = useRef(false);
+
+  const load = useCallback(async (showSpinner = true) => {
+    if (showSpinner) setLoading(true);
     setError(false);
     try {
       const [usageRes, sessionsRes, facetsRes, convsRes, costRes, historyRes, billingRes, hookRes] = await Promise.all([
@@ -730,11 +733,35 @@ export function ActivityView() {
     } catch {
       setError(true);
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { void load(); }, []);
+  // Initial load + 30s polling interval
+  useEffect(() => {
+    void load(true);
+    const interval = setInterval(() => { void load(false); }, 30_000);
+    return () => clearInterval(interval);
+  }, [load]);
+
+  // SSE: re-fetch silently on file changes; append hook events directly
+  useSSEEvents((data) => {
+    if (data.type === "sessions") {
+      void load(false);
+    } else if (data.type === "hook") {
+      const event = data as unknown as HookEvent;
+      setHookEvents(prev => [event, ...prev].slice(0, 100));
+      setHasHooks(true);
+      // Debounce full reload for billing block update
+      if (!loadRef.current) {
+        loadRef.current = true;
+        setTimeout(() => {
+          loadRef.current = false;
+          void load(false);
+        }, 2000);
+      }
+    }
+  });
 
   if (loading) {
     return (
@@ -810,7 +837,7 @@ export function ActivityView() {
           </div>
         </div>
         <button
-          onClick={load}
+          onClick={() => void load(true)}
           className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
         >
           <RefreshCw className="size-3" />
