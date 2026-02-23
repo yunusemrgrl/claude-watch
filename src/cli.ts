@@ -3,7 +3,7 @@
 import { Command } from 'commander';
 import { mkdirSync, writeFileSync, existsSync, readdirSync, readFileSync, statSync, watch } from 'fs';
 import { join } from 'path';
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { startServer } from './server/server.js';
 import {
   captureContextSnapshot, writeContextSnapshot, readContextSnapshot,
@@ -872,10 +872,9 @@ program
   .command('upgrade')
   .description('Upgrade claudedash to the latest version')
   .action(() => {
-    const current = '1.1.26';
+    const current = '1.1.27';
     console.log(`\nclaudedash v${current} → checking for updates...\n`);
 
-    // Detect how claudedash was installed (global npm prefix)
     execFile('npm', ['show', 'claudedash', 'version'], (err, stdout) => {
       if (err) {
         console.error('❌ Could not fetch latest version from npm:', err.message);
@@ -888,19 +887,29 @@ program
       }
       console.log(`  Latest : v${latest}`);
       console.log(`  Current: v${current}`);
-      console.log(`\n  Installing...\n`);
+      console.log(`  Installing...\n`);
 
-      execFile('npm', ['install', '-g', `claudedash@${latest}`], (installErr, _out, stderr) => {
-        if (installErr) {
-          // Likely a permission error — suggest sudo or npx
-          console.error('❌ Install failed:', stderr.trim() || installErr.message);
-          console.log('\nTry one of:');
-          console.log(`  sudo npm install -g claudedash@${latest}`);
-          console.log(`  npx claudedash@${latest} start   (no install needed)`);
-          process.exit(1);
-        }
-        console.log(`✅ Upgraded to v${latest}\n`);
-      });
+      const runInstall = (useSudo: boolean) => {
+        const args = useSudo
+          ? ['npm', 'install', '-g', `claudedash@${latest}`]
+          : ['install', '-g', `claudedash@${latest}`];
+        const cmd = useSudo ? 'sudo' : 'npm';
+        const child = spawn(cmd, args, { stdio: 'inherit' });
+        child.on('close', (code) => {
+          if (code === 0) {
+            console.log(`\n✅ Upgraded to v${latest}\n`);
+          } else if (!useSudo) {
+            // Retry with sudo (permission denied)
+            console.log('  Permission denied — retrying with sudo...\n');
+            runInstall(true);
+          } else {
+            console.error('\n❌ Upgrade failed.');
+            process.exit(1);
+          }
+        });
+      };
+
+      runInstall(false);
     });
   });
 
