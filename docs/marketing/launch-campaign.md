@@ -59,11 +59,12 @@
 
 **Tweet 1/10**
 ```
-I've been running 5 Claude Code agents in parallel for 3 months.
+I gave Claude Code a 3-hour task last week.
 
-For 3 months I had zero visibility into what they were doing.
+Terminal scrolling. Zero visibility.
+Is it stuck? Done? Looping?
 
-Then I built claudedash. Here's what I see now 🧵
+I had no idea. So I built something. 🧵
 ```
 
 **Tweet 2/10**
@@ -374,15 +375,13 @@ github.com/yunusemrgrl/claudedash
 > **Carousel suggestion:** 6 slides (dashboard → context health → worktrees → plan → MCP → install command)
 
 ```
-I used to spend the first 30 minutes of every morning running
-cat ~/.claude/tasks/*.json to figure out what my agents did overnight.
+I gave Claude Code a long autonomous task.
 
-That's done now.
+Came back an hour later. Terminal had scrolled thousands of lines.
+200 new lines of code written. But what actually happened?
+I had to read through tool calls to reconstruct it.
 
-We've been running Claude Code agents across 4 parallel worktrees for 6 weeks.
-One agent per feature branch. The output has been impressive — but the visibility
-was zero. You'd come back, see 200 new lines of code, and spend 20 minutes
-reconstructing what actually happened.
+That's the visibility problem with AI coding agents. I built claudedash to fix it.
 
 claudedash solves this at the infrastructure level.
 
@@ -521,7 +520,7 @@ What's your philosophy for adopting new dev tools? 👇
 ```
 Hey r/ClaudeAI,
 
-I've been running 3–5 Claude Code agents in parallel for a few months
+I've been using Claude Code heavily for autonomous tasks
 and the lack of visibility was killing me.
 
 So I built claudedash — a real-time local dashboard that reads Claude's
