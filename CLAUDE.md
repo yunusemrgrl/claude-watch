@@ -36,6 +36,14 @@ If any step fails: fix the error first, then re-run from the beginning. Never co
 - After modifying authentication-related logic, audit ALL screens, tabs, and modules that perform API calls.
 - Ensure coverage consistency across the entire authenticated surface — not only the screen that exposed the issue.
 
+## Publishing
+
+**NEVER run `npm publish` manually.** Publishing is fully automated via GitHub Actions.
+
+Flow: bump version with `npm version patch` → commit → push → `auto-tag.yml` triggers automatically → builds, publishes to npm, creates git tag + GitHub Release.
+
+The workflow only publishes if the version is not already on npm, so re-pushes are safe.
+
 ## Task Tracking
 
 If `.claudedash/queue.md` exists, follow `.claudedash/workflow.md` for structured task execution.
