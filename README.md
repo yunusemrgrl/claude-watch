@@ -280,7 +280,7 @@ npm run dev      # Dev server with watch
 ## Contributing
 
 PRs welcome. Open an issue first for anything beyond small fixes.
-See [CHANGELOG.md](CHANGELOG.md) for release history.
+See [Releases](https://github.com/yunusemrgrl/claudedash/releases) for version history.
 
 ## License
 
