@@ -1,6 +1,6 @@
 {
   "name": "claudedash",
-  "version": "1.1.22",
+  "version": "1.1.23",
   "description": "Live Kanban, quality gates and context health monitoring for Claude Code agents",
   "type": "module",
   "bin": {

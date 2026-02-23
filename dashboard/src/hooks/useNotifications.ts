@@ -32,7 +32,8 @@ function diffLiveTasks(
   const changes: Array<{ subject: string; project: string | null }> = [];
   for (const session of sessions) {
     for (const task of session.tasks) {
-      const prevStatus = prev.get(task.id);
+      const key = `${session.id}:${task.id}`;
+      const prevStatus = prev.get(key);
       if (prevStatus && prevStatus !== task.status && task.status === "completed") {
         changes.push({ subject: task.subject, project: session.projectName ?? null });
       }
@@ -85,7 +86,6 @@ export function useNotifications() {
     if (event.type === "sessions") {
       // Read from module-level store updated by useSessions — no duplicate fetch
       const sessionList = getLatestSessions();
-      const allTasks = sessionList.flatMap((s) => s.tasks);
 
       if (initializedLive.current) {
         const changes = diffLiveTasks(prevLiveMap.current, sessionList);
@@ -104,7 +104,9 @@ export function useNotifications() {
       updateTabTitle(0, 0);
 
       const newMap = new Map<string, string>();
-      for (const task of allTasks) newMap.set(task.id, task.status);
+      for (const session of sessionList) {
+        for (const task of session.tasks) newMap.set(`${session.id}:${task.id}`, task.status);
+      }
       prevLiveMap.current = newMap;
       initializedLive.current = true;
     }

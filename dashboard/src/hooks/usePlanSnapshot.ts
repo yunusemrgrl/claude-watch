@@ -8,8 +8,8 @@ let _latestSnapshot: SnapshotResponse | null = null;
 export function getLatestSnapshot(): SnapshotResponse | null { return _latestSnapshot; }
 
 export function usePlanSnapshot() {
-  const [data, setData] = useState<SnapshotResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<SnapshotResponse | null>(() => _latestSnapshot);
+  const [loading, setLoading] = useState(() => _latestSnapshot === null);
 
   const fetchSnapshot = useCallback(async () => {
     try {
