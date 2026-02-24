@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Save, RefreshCw, FileText, CheckCircle, AlertCircle } from "lucide-react";
+import {
+  Save,
+  RefreshCw,
+  FileText,
+  CheckCircle,
+  AlertCircle,
+} from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ClaudeMdResponse } from "@/types";
 
@@ -33,7 +39,9 @@ export function ClaudeMdView() {
       .catch(() => setLoading(false));
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const save = async (file: FileKey) => {
     setSaveState({ status: "saving" });
@@ -65,8 +73,16 @@ export function ClaudeMdView() {
   }
 
   const tabs: { key: FileKey; label: string; subtitle: string }[] = [
-    { key: "plan", label: ".claudedash/CLAUDE.md", subtitle: "Plan mode instructions injected into every agent context" },
-    { key: "project", label: "CLAUDE.md", subtitle: "Project root — global agent instructions for this repository" },
+    {
+      key: "plan",
+      label: ".claudedash/CLAUDE.md",
+      subtitle: "Plan mode instructions injected into every agent context",
+    },
+    {
+      key: "project",
+      label: "CLAUDE.md",
+      subtitle: "Project root — global agent instructions for this repository",
+    },
   ];
 
   const activeFile = data?.[activeTab];
@@ -80,8 +96,12 @@ export function ClaudeMdView() {
         <div className="flex items-center gap-3">
           <FileText className="size-4 text-muted-foreground" />
           <div>
-            <h2 className="text-sm font-medium text-foreground">CLAUDE.md Editor</h2>
-            <p className="text-xs text-muted-foreground">Edit agent instruction files</p>
+            <h2 className="text-sm font-medium text-foreground">
+              CLAUDE.md Editor
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Edit agent instruction files
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -136,11 +156,15 @@ export function ClaudeMdView() {
           <p className="text-xs text-muted-foreground">
             {tabs.find((t) => t.key === activeTab)?.subtitle}
             {activeFile?.path && (
-              <span className="ml-2 font-mono opacity-60">{activeFile.path}</span>
+              <span className="ml-2 font-mono opacity-60">
+                {activeFile.path}
+              </span>
             )}
           </p>
           {!activeFile?.exists && (
-            <p className="text-xs text-amber-500 mt-0.5">File does not exist yet — saving will create it.</p>
+            <p className="text-xs text-amber-500 mt-0.5">
+              File does not exist yet — saving will create it.
+            </p>
           )}
         </div>
       )}
@@ -150,14 +174,18 @@ export function ClaudeMdView() {
         <div className="p-4 h-full">
           {!activeFile?.path ? (
             <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-              Plan mode not configured — run <code className="mx-1 bg-muted px-1 rounded">claudedash init</code> first.
+              Plan mode not configured — run{" "}
+              <code className="mx-1 bg-muted px-1 rounded">
+                claudedash init
+              </code>{" "}
+              first.
             </div>
           ) : (
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
               spellCheck={false}
-              className="w-full min-h-[60vh] bg-transparent text-sm font-mono text-foreground placeholder-muted-foreground resize-none focus:outline-none leading-relaxed"
+              className="w-full min-h-[75vh] bg-transparent text-sm font-mono text-foreground placeholder-muted-foreground resize-none focus:outline-none leading-relaxed"
               placeholder="# CLAUDE.md&#10;&#10;Start writing agent instructions..."
             />
           )}
