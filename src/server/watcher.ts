@@ -2,10 +2,12 @@ import { watch, type FSWatcher } from 'chokidar';
 import { EventEmitter } from 'events';
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { DEFAULT_SOURCE, getSourceLayout, type SourceProvider } from '../platform/source.js';
 
 export interface WatcherOptions {
   claudeDir: string;
   planDir?: string;
+  source?: SourceProvider;
 }
 
 export interface WatchEvent {
@@ -22,9 +24,10 @@ export function createWatcher(options: WatcherOptions): { watcher: FSWatcher; em
   const emitter = new EventEmitter();
   const watchPaths: string[] = [];
   const trackedSessionDirs = new Set<string>();
+  const layout = getSourceLayout(options.source ?? DEFAULT_SOURCE, options.claudeDir);
 
-  const claudeTasksDir = join(options.claudeDir, 'tasks');
-  const claudeTodosDir = join(options.claudeDir, 'todos');
+  const claudeTasksDir = layout.tasksDir;
+  const claudeTodosDir = layout.todosDir;
 
   // Add existing session directories
   for (const dir of [claudeTasksDir, claudeTodosDir]) {

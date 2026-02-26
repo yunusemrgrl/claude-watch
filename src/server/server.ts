@@ -9,6 +9,7 @@ import { createWatcher } from './watcher.js';
 import { liveRoutes } from './routes/live.js';
 import { planRoutes } from './routes/plan.js';
 import { observabilityRoutes } from './routes/observability.js';
+import { DEFAULT_SOURCE, type SourceProvider } from '../platform/source.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -19,10 +20,27 @@ export interface ServerOptions {
   port: number;
   host?: string;
   token?: string;
+  source?: SourceProvider;
+}
+
+function parseCookieToken(header: string | undefined, name: string): string | undefined {
+  if (!header) return undefined;
+  const parts = header.split(';');
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed.startsWith(`${name}=`)) continue;
+    const raw = trimmed.slice(name.length + 1);
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
+  }
+  return undefined;
 }
 
 export async function startServer(options: ServerOptions): Promise<void> {
-  const { claudeDir, port, planDir, host = '127.0.0.1', token } = options;
+  const { claudeDir, port, planDir, host = '127.0.0.1', token, source = DEFAULT_SOURCE } = options;
 
   const fastify = Fastify({ logger: false, routerOptions: { ignoreTrailingSlash: true } });
 
@@ -57,21 +75,47 @@ export async function startServer(options: ServerOptions): Promise<void> {
     fastify.addHook('onRequest', async (request, reply) => {
       // Static assets and dashboard HTML pass through
       const url = request.url.split('?')[0];
+      const isPublicAuthRoute = url === '/auth/login' || url === '/auth/logout';
       const isApi = !url.match(/\.(html|js|css|png|svg|ico|woff2?)$/) && url !== '/';
-      if (!isApi) return;
+      if (!isApi || isPublicAuthRoute) return;
 
       const authHeader = request.headers['authorization'];
       const provided = authHeader?.startsWith('Bearer ')
         ? authHeader.slice(7)
         : undefined;
+      const cookieToken = parseCookieToken(request.headers.cookie, 'claudedash_token');
 
-      if (provided !== token) {
+      if (provided !== token && cookieToken !== token) {
         return reply.code(401).send({ error: 'Unauthorized. Use Authorization: Bearer <token>' });
       }
     });
   }
 
-  const { watcher, emitter } = createWatcher({ claudeDir, planDir });
+  fastify.post<{ Body: { token?: string } }>(
+    '/auth/login',
+    {
+      config: {
+        rateLimit: {
+          max: 20,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!token) return reply.code(400).send({ error: 'Token auth is not enabled on this server.' });
+      const provided = typeof request.body?.token === 'string' ? request.body.token : '';
+      if (provided !== token) return reply.code(401).send({ error: 'Invalid token' });
+      reply.header('Set-Cookie', `claudedash_token=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=43200`);
+      return { ok: true };
+    }
+  );
+
+  fastify.post('/auth/logout', async (_request, reply) => {
+    reply.header('Set-Cookie', 'claudedash_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0');
+    return { ok: true };
+  });
+
+  const { watcher, emitter } = createWatcher({ claudeDir, planDir, source });
 
   fastify.addHook('onClose', async () => { await watcher.close(); });
 
@@ -110,9 +154,9 @@ export async function startServer(options: ServerOptions): Promise<void> {
     return result;
   });
 
-  await fastify.register(liveRoutes, { claudeDir, planDir, emitter });
+  await fastify.register(liveRoutes, { claudeDir, planDir, emitter, source });
   await fastify.register(planRoutes, { claudeDir, planDir, emitter });
-  await fastify.register(observabilityRoutes, { claudeDir, emitter });
+  await fastify.register(observabilityRoutes, { claudeDir, emitter, source });
 
   // Serve static dashboard + SPA fallback
   const publicPath = join(__dirname, '../public');

@@ -66,16 +66,19 @@ function tailRead(filePath: string, lineCount: number): { lines: string[]; total
 
 import type { WatchEvent } from '../watcher.js';
 import type { EventEmitter } from 'events';
+import { DEFAULT_SOURCE, getSourceLayout, hasLiveSourceData, type SourceProvider } from '../../platform/source.js';
 
 export interface LiveRouteOptions {
   claudeDir: string;
   planDir?: string;
   emitter: EventEmitter;
+  source?: SourceProvider;
 }
 
 
 export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOptions): Promise<void> {
-  const { claudeDir, planDir, emitter } = opts;
+  const { claudeDir, planDir, emitter, source = DEFAULT_SOURCE } = opts;
+  const sourceLayout = getSourceLayout(source, claudeDir);
   const hub = new SseHub();
   const sessions = new SessionService(claudeDir);
   const hooks = new HookService(claudeDir, planDir);
@@ -90,10 +93,11 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
   });
 
   fastify.get('/health', async () => {
-    const hasLive = existsSync(join(claudeDir, 'tasks')) || existsSync(join(claudeDir, 'todos'));
+    const hasLive = hasLiveSourceData(source, claudeDir);
     const hasPlan = planDir ? existsSync(join(planDir, 'queue.md')) : false;
     return {
       status: 'ok',
+      source,
       modes: { live: hasLive, plan: hasPlan },
       connectedClients: hub.clientCount,
       lastSessions,
@@ -153,7 +157,7 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
     const { id } = request.params;
 
     // Find JSONL file in ~/.claude/projects/*/*
-    const projectsDir = join(claudeDir, 'projects');
+    const projectsDir = sourceLayout.projectsDir;
     let jsonlPath: string | null = null;
     if (existsSync(projectsDir)) {
       try {
@@ -237,15 +241,26 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
   );
 
   // POST /hook — receives Claude Code hook events, fans out via SSE, stores in ring buffer
-  fastify.post<{ Body: Record<string, unknown> }>('/hook', async (request) => {
-    const hookEvent = hooks.push(request.body ?? {});
-    hub.broadcast(hookEvent);
+  fastify.post<{ Body: Record<string, unknown> }>(
+    '/hook',
+    {
+      config: {
+        rateLimit: {
+          max: 30,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    async (request) => {
+      const hookEvent = hooks.push(request.body ?? {});
+      hub.broadcast(hookEvent);
 
-    if (hookEvent.event === 'PreCompact') await hooks.handlePreCompact(hookEvent);
-    if (hookEvent.event === 'PostCompact') hooks.handlePostCompact(hookEvent);
+      if (hookEvent.event === 'PreCompact') await hooks.handlePreCompact(hookEvent);
+      if (hookEvent.event === 'PostCompact') hooks.handlePostCompact(hookEvent);
 
-    return { ok: true, receivedAt: hookEvent.receivedAt };
-  });
+      return { ok: true, receivedAt: hookEvent.receivedAt };
+    }
+  );
 
   // GET /hook/events — returns the ring buffer of recent hook events
   fastify.get('/hook/events', async () => {

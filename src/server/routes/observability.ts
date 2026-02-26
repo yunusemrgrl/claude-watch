@@ -6,14 +6,17 @@ import { detectWorktrees, enrichWorktreeStatus } from '../../core/worktreeDetect
 import { mapTasksToWorktrees } from '../../core/worktreeMapper.js';
 import type { EventEmitter } from 'events';
 import type { WatchEvent } from '../watcher.js';
+import { DEFAULT_SOURCE, getSourceLayout, type SourceProvider } from '../../platform/source.js';
 
 export interface ObservabilityRouteOptions {
   claudeDir: string;
   emitter?: EventEmitter;
+  source?: SourceProvider;
 }
 
 export async function observabilityRoutes(fastify: FastifyInstance, opts: ObservabilityRouteOptions): Promise<void> {
-  const { claudeDir, emitter } = opts;
+  const { claudeDir, emitter, source = DEFAULT_SOURCE } = opts;
+  const sourceLayout = getSourceLayout(source, claudeDir);
 
   // ── Server-side caches ────────────────────────────────────────────────────
   // /history: mtime-based — only re-parse history.jsonl when file changes
@@ -32,7 +35,7 @@ export async function observabilityRoutes(fastify: FastifyInstance, opts: Observ
 
   // GET /usage — reads ~/.claude/stats-cache.json (written by Claude Code)
   fastify.get('/usage', async (_req, reply) => {
-    const statsPath = join(claudeDir, 'stats-cache.json');
+    const statsPath = sourceLayout.statsCachePath;
     if (!existsSync(statsPath)) {
       return reply.code(404).send({
         error: 'Usage data not found',
@@ -62,7 +65,7 @@ export async function observabilityRoutes(fastify: FastifyInstance, opts: Observ
 
   // GET /activity/sessions — reads ~/.claude/usage-data/session-meta/*.json
   fastify.get('/activity/sessions', async (_req, reply) => {
-    const sessionMetaDir = join(claudeDir, 'usage-data', 'session-meta');
+    const sessionMetaDir = join(sourceLayout.usageDataDir, 'session-meta');
     if (!existsSync(sessionMetaDir)) {
       return reply.code(404).send({
         error: 'Session metadata not found',
@@ -118,7 +121,7 @@ export async function observabilityRoutes(fastify: FastifyInstance, opts: Observ
 
   // GET /history — reads ~/.claude/history.jsonl (full cross-project prompt history)
   fastify.get<{ Querystring: { limit?: string; offset?: string } }>('/history', async (_req, reply) => {
-    const historyPath = join(claudeDir, 'history.jsonl');
+    const historyPath = sourceLayout.historyPath;
     if (!existsSync(historyPath)) {
       return { prompts: [], topProjects: [] };
     }
@@ -188,7 +191,7 @@ export async function observabilityRoutes(fastify: FastifyInstance, opts: Observ
 
   // GET /facets — reads ~/.claude/usage-data/facets/*.json (AI-generated session analysis)
   fastify.get('/facets', async (_req, reply) => {
-    const facetsDir = join(claudeDir, 'usage-data', 'facets');
+    const facetsDir = join(sourceLayout.usageDataDir, 'facets');
     if (!existsSync(facetsDir)) {
       return { sessions: [], aggregate: null };
     }
@@ -272,7 +275,7 @@ export async function observabilityRoutes(fastify: FastifyInstance, opts: Observ
 
   // GET /conversations — parses ~/.claude/projects/ JSONL files for tool analytics
   fastify.get('/conversations', async (_req, reply) => {
-    const projectsDir = join(claudeDir, 'projects');
+    const projectsDir = sourceLayout.projectsDir;
     if (!existsSync(projectsDir)) {
       return { sessions: [], aggregate: null };
     }
@@ -418,7 +421,7 @@ export async function observabilityRoutes(fastify: FastifyInstance, opts: Observ
 
   // GET /cost — estimates Claude API cost from stats-cache.json modelUsage
   fastify.get('/cost', async (_req, reply) => {
-    const statsPath = join(claudeDir, 'stats-cache.json');
+    const statsPath = sourceLayout.statsCachePath;
     if (!existsSync(statsPath)) {
       return reply.code(404).send({ error: 'stats-cache.json not found' });
     }
@@ -491,7 +494,7 @@ export async function observabilityRoutes(fastify: FastifyInstance, opts: Observ
 
   // GET /plans — reads ~/.claude/plans/*.md (Claude-generated plan documents)
   fastify.get('/plans', async () => {
-    const plansDir = join(claudeDir, 'plans');
+    const plansDir = sourceLayout.plansDir;
     if (!existsSync(plansDir)) return { plans: [] };
     try {
       const files = readdirSync(plansDir).filter(f => f.endsWith('.md'));
@@ -520,7 +523,7 @@ export async function observabilityRoutes(fastify: FastifyInstance, opts: Observ
 
   // GET /billing-block — computes current 5-hour billing window token usage from JSONL
   fastify.get('/billing-block', async () => {
-    const projectsDir = join(claudeDir, 'projects');
+    const projectsDir = sourceLayout.projectsDir;
     if (!existsSync(projectsDir)) return { active: false };
     // Return cached result if still fresh (60s TTL)
     const now = Date.now();

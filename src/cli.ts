@@ -9,12 +9,13 @@ import {
   captureContextSnapshot, writeContextSnapshot, readContextSnapshot,
   formatRecoveryOutput, listSnapshots, readSnapshotByHash, deleteSnapshot,
 } from './core/contextCapture.js';
+import { DEFAULT_SOURCE, getSourceLayout, hasLiveSourceData, parseSource } from './platform/source.js';
 
 const program = new Command();
 
 program
   .name('claudedash')
-  .description('Live Kanban, quality gates and context health monitoring for Claude Code agents')
+  .description('Local agent control plane with recovery, quality gates, and context safety for Claude Code')
   .version('1.1.29');
 
 program
@@ -412,24 +413,33 @@ Warns when a new source file is created without a corresponding test file.
 
 program
   .command('start')
-  .description('Start the claudedash server and dashboard')
+  .description('Start the claudedash control plane API (web UI is optional)')
   .option('--claude-dir <path>', 'Path to Claude directory', join(process.env.HOME || '~', '.claude'))
+  .option('--source <name>', 'Data source provider (currently: claude-code)', DEFAULT_SOURCE)
   .option('-p, --port <number>', 'Port number', '4317')
   .option('--host <host>', 'Bind host', '127.0.0.1')
+  .option('--open', 'Open the companion web UI in your browser')
   .option('--no-bell', 'Disable terminal bell on task alerts')
   .option('--token <secret>', 'Require Bearer token for all API requests (reads CLAUDEDASH_TOKEN env var if not provided)')
   .option('--auto-commit', 'Enable automatic git commit on PreCompact hook (opt-in; default: off)')
   .action(async (opts) => {
     const claudeDir = opts.claudeDir;
     const claudeWatchDir = join(process.cwd(), '.claudedash');
+    const source = parseSource(opts.source as string | undefined);
+    if (!source) {
+      console.error(`❌ Unsupported --source: ${opts.source as string}`);
+      console.error('   Supported values: claude-code');
+      process.exit(1);
+    }
+    const sourceLayout = getSourceLayout(source, claudeDir);
 
     // Detect available modes
-    const hasLive = existsSync(join(claudeDir, 'tasks'));
+    const hasLive = hasLiveSourceData(source, claudeDir);
     const hasPlan = existsSync(claudeWatchDir);
 
     if (!hasLive && !hasPlan) {
       console.error('❌ No data sources found.');
-      console.error(`   Live mode: ${claudeDir}/tasks/ not found`);
+      console.error(`   Live mode: ${sourceLayout.tasksDir} and ${sourceLayout.todosDir} not found`);
       console.error('   Plan mode: .claudedash/ not found (run "claudedash init")');
       process.exit(1);
     }
@@ -489,23 +499,27 @@ program
         host,
         planDir: hasPlan ? claudeWatchDir : undefined,
         token,
+        source,
       });
 
       console.log(`✓ Server running on ${url}`);
-      if (hasLive) console.log(`  Live mode: watching ${claudeDir}/tasks/`);
+      console.log(`  Source: ${source}`);
+      if (hasLive) console.log(`  Live mode: watching ${sourceLayout.tasksDir} + ${sourceLayout.todosDir}`);
       if (hasPlan) console.log('  Plan mode: reading .claudedash/');
-      console.log('✓ Opening browser...');
-
-      const platform = process.platform;
-      const openCommand = platform === 'darwin' ? 'open' :
-                         platform === 'win32' ? 'start' :
-                         'xdg-open';
-
-      execFile(openCommand, [url], (error) => {
-        if (error) {
-          console.log('Could not auto-open browser. Please visit:', url);
-        }
-      });
+      if (opts.open) {
+        console.log('✓ Opening web UI...');
+        const platform = process.platform;
+        const openCommand = platform === 'darwin' ? 'open' :
+                           platform === 'win32' ? 'start' :
+                           'xdg-open';
+        execFile(openCommand, [url], (error) => {
+          if (error) {
+            console.log('Could not auto-open browser. Please visit:', url);
+          }
+        });
+      } else {
+        console.log(`✓ Control plane API ready. Run \`claudedash start --open\` to launch the web UI.`);
+      }
 
       // Watch execution.log for FAILED/BLOCKED events and alert in terminal
       if (hasPlan) {
@@ -934,8 +948,16 @@ program
   .command('doctor')
   .description('Check claudedash environment and configuration')
   .option('--claude-dir <path>', 'Path to Claude directory', join(process.env.HOME || '~', '.claude'))
+  .option('--source <name>', 'Data source provider (currently: claude-code)', DEFAULT_SOURCE)
   .action(async (opts) => {
     const claudeDir = opts.claudeDir;
+    const source = parseSource(opts.source as string | undefined);
+    if (!source) {
+      console.error(`❌ Unsupported --source: ${opts.source as string}`);
+      console.error('   Supported values: claude-code');
+      process.exit(1);
+    }
+    const sourceLayout = getSourceLayout(source, claudeDir);
     const claudeWatchDir = join(process.cwd(), '.claudedash');
     const checks: Array<{ label: string; ok: boolean; note?: string }> = [];
 
@@ -957,9 +979,11 @@ program
     const claudeDirExists = existsSync(claudeDir);
     checks.push({ label: `~/.claude/ directory (${claudeDir})`, ok: claudeDirExists, note: claudeDirExists ? undefined : 'Not found — Claude Code may not be installed' });
 
-    // ~/.claude/tasks/ (live mode)
-    const tasksDir = join(claudeDir, 'tasks');
-    checks.push({ label: '~/.claude/tasks/ (Live mode data)', ok: existsSync(tasksDir) });
+    // source live directories
+    checks.push({
+      label: `${sourceLayout.tasksDir} or ${sourceLayout.todosDir} (Live mode data)`,
+      ok: existsSync(sourceLayout.tasksDir) || existsSync(sourceLayout.todosDir),
+    });
 
     // .claudedash/ (plan mode)
     checks.push({ label: '.claudedash/ (Plan mode)', ok: existsSync(claudeWatchDir) });
@@ -1074,8 +1098,10 @@ program
         catch { console.error('Failed to parse settings.json'); process.exit(1); }
       }
 
-      const hookCmd = (event: string) =>
-        `curl -sf -X POST http://localhost:${port}/hook -H 'Content-Type: application/json' -d "{\"event\":\"${event}\",\"tool\":\"$CLAUDE_TOOL_NAME\",\"session\":\"$CLAUDE_SESSION_ID\",\"cwd\":\"$CLAUDE_CWD\"}" || true`;
+      // Claude Code passes hook event data via stdin as JSON (tool_name, session_id, etc.)
+      // We forward stdin directly to the server; HookService normalises the field names.
+      const hookCmd = (_event: string) =>
+        `curl -sf -X POST http://localhost:${port}/hook -H 'Content-Type: application/json' -d @- || true`;
 
       const hooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
 
@@ -1169,13 +1195,23 @@ program
   .command('mcp')
   .description('Start claudedash as an MCP server (stdio transport). Add with: claude mcp add claudedash -- npx -y claudedash@latest mcp')
   .option('--port <port>', 'claudedash server port to proxy', '4317')
-  .action((opts: { port: string }) => {
+  .option('--token <secret>', 'Bearer token for protected claudedash server (reads CLAUDEDASH_TOKEN env var if not provided)')
+  .action((opts: { port: string; token?: string }) => {
     const port = opts.port;
     const baseUrl = `http://localhost:${port}`;
+    const token = opts.token ?? process.env.CLAUDEDASH_TOKEN;
+
+    const withAuth = (headers: Record<string, string> = {}): Record<string, string> =>
+      token
+        ? { ...headers, Authorization: `Bearer ${token}` }
+        : headers;
 
     async function tryFetch<T>(path: string): Promise<T | null> {
       try {
-        const res = await fetch(`${baseUrl}${path}`, { signal: AbortSignal.timeout(2000) });
+        const res = await fetch(`${baseUrl}${path}`, {
+          signal: AbortSignal.timeout(2000),
+          headers: withAuth(),
+        });
         return res.ok ? (res.json() as Promise<T>) : null;
       } catch { return null; }
     }
@@ -1385,7 +1421,7 @@ program
             try {
               const res = await fetch(`${baseUrl}/log`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: withAuth({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ task_id, status, reason, agent: agent ?? 'mcp' }),
                 signal: AbortSignal.timeout(2000),
               });
@@ -1409,7 +1445,7 @@ program
           try {
             const res = await fetch(`${baseUrl}/agent/register`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: withAuth({ 'Content-Type': 'application/json' }),
               body: JSON.stringify({ agentId, name: agentName ?? agentId, taskId, sessionId }),
               signal: AbortSignal.timeout(2000),
             });
@@ -1423,7 +1459,7 @@ program
           try {
             const res = await fetch(`${baseUrl}/agent/heartbeat`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: withAuth({ 'Content-Type': 'application/json' }),
               body: JSON.stringify({ agentId, ...(hbStatus ? { status: hbStatus } : {}), ...(taskId !== undefined ? { taskId } : {}) }),
               signal: AbortSignal.timeout(2000),
             });
@@ -1437,7 +1473,7 @@ program
           try {
             const res = await fetch(`${baseUrl}/plan/task`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: withAuth({ 'Content-Type': 'application/json' }),
               body: JSON.stringify({ description, ...(slice ? { slice } : {}), ...(area ? { area } : {}), ...(ac ? { ac } : {}), ...(dependsOn ? { dependsOn } : {}) }),
               signal: AbortSignal.timeout(2000),
             });
@@ -1517,13 +1553,21 @@ program
 // ── status command ─────────────────────────────────────────────────────────────
 program
   .command('status')
-  .description('Show a one-line dashboard status summary (sessions, tasks, cost, billing block)')
+  .description('Show a one-line control plane status summary (sessions, tasks, cost, billing block)')
   .option('--port <port>', 'claudedash server port', '4317')
+  .option('--source <name>', 'Data source provider (currently: claude-code)', DEFAULT_SOURCE)
   .option('--json', 'output machine-readable JSON')
-  .action(async (opts: { port: string; json?: boolean }) => {
+  .action(async (opts: { port: string; source?: string; json?: boolean }) => {
     const port = opts.port;
     const baseUrl = `http://localhost:${port}`;
     const claudeDir = join(process.env.HOME ?? '~', '.claude');
+    const source = parseSource(opts.source);
+    if (!source) {
+      console.error(`❌ Unsupported --source: ${opts.source as string}`);
+      console.error('   Supported values: claude-code');
+      process.exit(1);
+    }
+    const sourceLayout = getSourceLayout(source, claudeDir);
 
     interface SessionsData { sessions?: Array<{ tasks?: Array<{ status: string }> }> }
     interface BillingData { active?: boolean; minutesRemaining?: number; estimatedCostUSD?: number }
@@ -1564,9 +1608,9 @@ program
       }
     } else {
       // Fallback: read directly from files
-      const todosDir = join(claudeDir, 'todos');
+      const todosDir = sourceLayout.todosDir;
       if (existsSync(todosDir)) {
-        const files = readdirSync(todosDir).filter((f) => f.endsWith('.jsonl'));
+        const files = readdirSync(todosDir).filter((f) => f.endsWith('.json') || f.endsWith('.jsonl'));
         const fiveMinAgo = Date.now() - 5 * 60 * 1000;
         for (const file of files) {
           const path = join(todosDir, file);

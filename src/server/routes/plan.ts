@@ -154,7 +154,17 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
 
   fastify.post<{
     Body: { description: string; slice?: string; area?: string; priority?: string; dependsOn?: string; ac?: string };
-  }>('/plan/task', async (request, reply) => {
+  }>(
+    '/plan/task',
+    {
+      config: {
+        rateLimit: {
+          max: 30,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    async (request, reply) => {
     if (!planDir) return reply.code(400).send({ error: 'Plan mode not configured' });
 
     const { description, slice, area = 'General', priority = 'medium', dependsOn = '-', ac = '-' } = request.body ?? {};
@@ -200,12 +210,23 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
     if (emitter) emitter.emit('change', { type: 'plan', timestamp: new Date().toISOString() });
 
     return { ok: true, task_id: nextId, description: description.trim() };
-  });
+    }
+  );
 
   fastify.patch<{
     Params: { taskId: string };
     Body: { status: 'DONE' | 'BLOCKED' | 'FAILED'; reason?: string };
-  }>('/plan/task/:taskId', async (request, reply) => {
+  }>(
+    '/plan/task/:taskId',
+    {
+      config: {
+        rateLimit: {
+          max: 60,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    async (request, reply) => {
     if (!planDir) return reply.code(400).send({ error: 'Plan mode not configured' });
 
     const { taskId } = request.params;
@@ -234,11 +255,21 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
     if (emitter) emitter.emit('change', { type: 'plan', timestamp: new Date().toISOString() });
 
     return { ok: true, task_id: taskId, status };
-  });
+    }
+  );
 
   // POST /log — agent HTTP execution log append (ai_feedback.md #3)
   fastify.post<{ Body: { task_id?: string; status?: string; agent?: string; reason?: string; meta?: unknown } }>(
-    '/log', async (request, reply) => {
+    '/log',
+    {
+      config: {
+        rateLimit: {
+          max: 120,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    async (request, reply) => {
       if (!planDir) return reply.code(404).send({ error: 'Plan mode not configured. Run claudedash init first.' });
 
       const { task_id, status, agent = 'agent', reason, meta } = request.body ?? {};
@@ -337,7 +368,16 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
   const agentRegistry = new Map<string, AgentRecord>();
 
   fastify.post<{ Body: { agentId?: string; sessionId?: string; taskId?: string; name?: string } }>(
-    '/agent/register', async (request, reply) => {
+    '/agent/register',
+    {
+      config: {
+        rateLimit: {
+          max: 30,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    async (request, reply) => {
       const { agentId, sessionId, taskId, name } = request.body ?? {};
       if (!agentId) return reply.code(400).send({ error: 'agentId is required' });
 
@@ -358,7 +398,16 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
   );
 
   fastify.post<{ Body: { agentId?: string; status?: string; taskId?: string } }>(
-    '/agent/heartbeat', async (request, reply) => {
+    '/agent/heartbeat',
+    {
+      config: {
+        rateLimit: {
+          max: 240,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    async (request, reply) => {
       const { agentId, status, taskId } = request.body ?? {};
       if (!agentId) return reply.code(400).send({ error: 'agentId is required' });
 
@@ -400,7 +449,16 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
 
   // PUT /claudemd — save CLAUDE.md content
   fastify.put<{ Body: { file?: 'plan' | 'project'; content?: string } }>(
-    '/claudemd', async (request, reply) => {
+    '/claudemd',
+    {
+      config: {
+        rateLimit: {
+          max: 30,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    async (request, reply) => {
       if (!planDir) return reply.code(400).send({ error: 'Plan mode not configured' });
 
       const { file, content } = request.body ?? {};
@@ -441,12 +499,23 @@ export async function planRoutes(fastify: FastifyInstance, opts: PlanRouteOption
   });
 
   // DELETE /snapshots/:hash — delete a snapshot
-  fastify.delete<{ Params: { hash: string } }>('/snapshots/:hash', async (request, reply) => {
-    if (!planDir) return reply.code(404).send({ error: 'Plan mode not configured' });
-    const ok = deleteSnapshot(planDir, request.params.hash);
-    if (!ok) return reply.code(404).send({ error: 'Snapshot not found' });
-    return { ok: true };
-  });
+  fastify.delete<{ Params: { hash: string } }>(
+    '/snapshots/:hash',
+    {
+      config: {
+        rateLimit: {
+          max: 20,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!planDir) return reply.code(404).send({ error: 'Plan mode not configured' });
+      const ok = deleteSnapshot(planDir, request.params.hash);
+      if (!ok) return reply.code(404).send({ error: 'Snapshot not found' });
+      return { ok: true };
+    }
+  );
 
   fastify.get('/claude-insights', async (_request, reply) => {
     const reportPath = join(claudeDir, 'usage-data', 'report.html');
