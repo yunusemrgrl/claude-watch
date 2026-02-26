@@ -100,6 +100,7 @@ export interface SessionsResponse {
 
 export interface HealthResponse {
   status: string;
+  source?: string;
   modes: {
     live: boolean;
     plan: boolean;

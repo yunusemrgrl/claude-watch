@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
+import useSWR from "swr";
 import {
   Search,
   RefreshCw,
@@ -106,6 +107,18 @@ function fmtNum(n: number): string {
   return String(n);
 }
 
+type HttpError = Error & { status?: number };
+
+async function jsonFetcher<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    const error = new Error(`Request failed: ${response.status}`) as HttpError;
+    error.status = response.status;
+    throw error;
+  }
+  return response.json() as Promise<T>;
+}
+
 export default function Dashboard() {
   const [mode, setMode] = useState<ViewMode>("live");
   const [availableModes, setAvailableModes] = useState({
@@ -113,14 +126,27 @@ export default function Dashboard() {
     plan: false,
   });
   const [loading, setLoading] = useState(true);
+  const [authRequired, setAuthRequired] = useState(false);
+  const [authToken, setAuthToken] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authSubmitting, setAuthSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
   const [showCheatsheet, setShowCheatsheet] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { showDeniedBanner, dismissDeniedBanner, sseConnected } =
     useNotifications();
+  const { data: usageStats } = useSWR<UsageStats>(
+    "/usage",
+    jsonFetcher,
+    { revalidateOnFocus: false, shouldRetryOnError: false },
+  );
+  const { data: healthData, error: healthError } = useSWR<HealthResponse>(
+    "/health",
+    jsonFetcher,
+    { revalidateOnFocus: false, shouldRetryOnError: false },
+  );
 
   useKeyboardShortcuts({
     setMode,
@@ -131,37 +157,50 @@ export default function Dashboard() {
     showCheatsheet,
   });
 
-  // Fetch usage stats for top bar widget
   useEffect(() => {
-    const controller = new AbortController();
-    fetch("/usage", { signal: controller.signal })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: UsageStats | null) => {
-        if (d) setUsageStats(d);
-      })
-      .catch(() => {
-        /* no data — widget stays hidden */
-      });
-    return () => controller.abort();
-  }, []);
+    if (!healthData) return;
+    setAvailableModes(healthData.modes);
+    if (healthData.modes.live) setMode("live");
+    else if (healthData.modes.plan) setMode("plan");
+    else setMode("activity");
+    setError(null);
+    setAuthRequired(false);
+    setLoading(false);
+  }, [healthData]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    fetch("/health", { signal: controller.signal })
-      .then((r) => r.json())
-      .then((data: HealthResponse) => {
-        setAvailableModes(data.modes);
-        if (data.modes.live) setMode("live");
-        else if (data.modes.plan) setMode("plan");
-        else setMode("activity");
-        setLoading(false);
-      })
-      .catch(() => {
-        setError("Failed to connect to server");
-        setLoading(false);
+    if (!healthError) return;
+    if ((healthError as HttpError).status === 401) {
+      setAuthRequired(true);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+    setError("Failed to connect to server");
+    setLoading(false);
+  }, [healthError]);
+
+  const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAuthSubmitting(true);
+    setAuthError(null);
+    try {
+      const response = await fetch("/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: authToken }),
       });
-    return () => controller.abort();
-  }, []);
+      if (!response.ok) {
+        setAuthError("Invalid token");
+        return;
+      }
+      window.location.reload();
+    } catch {
+      setAuthError("Authentication request failed");
+    } finally {
+      setAuthSubmitting(false);
+    }
+  };
 
   const handleInsightsToggle = () => {
     setMode((prev) =>
@@ -187,6 +226,39 @@ export default function Dashboard() {
     return (
       <div className="h-screen bg-background flex items-center justify-center">
         <div className="text-destructive-foreground">Error: {error}</div>
+      </div>
+    );
+  }
+
+  if (authRequired) {
+    return (
+      <div className="h-screen bg-background flex items-center justify-center p-4">
+        <form
+          onSubmit={handleAuthSubmit}
+          className="w-full max-w-md bg-sidebar border border-sidebar-border rounded-xl p-6 space-y-4"
+        >
+          <div>
+            <h1 className="text-lg font-semibold text-foreground">Token Required</h1>
+            <p className="text-xs text-muted-foreground mt-1">
+              This claudedash server requires authentication. Enter your Bearer token.
+            </p>
+          </div>
+          <input
+            type="password"
+            value={authToken}
+            onChange={(e) => setAuthToken(e.target.value)}
+            placeholder="claudedash token"
+            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:border-ring"
+          />
+          {authError && <p className="text-xs text-destructive">{authError}</p>}
+          <button
+            type="submit"
+            disabled={!authToken || authSubmitting}
+            className="w-full bg-foreground text-background rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {authSubmitting ? "Signing in..." : "Sign In"}
+          </button>
+        </form>
       </div>
     );
   }
