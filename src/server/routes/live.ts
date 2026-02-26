@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { existsSync, readFileSync, writeFileSync, appendFileSync, readdirSync, openSync, readSync, fstatSync, closeSync } from 'fs';
 import { join } from 'path';
+import { SseHub } from '../../services/SseHub.js';
 
 /**
  * Read only the last `lineCount` lines of a file without loading the entire file.
@@ -109,8 +110,7 @@ function saveDismissed(claudeDir: string, dismissed: Set<string>): void {
 
 export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOptions): Promise<void> {
   const { claudeDir, planDir, emitter } = opts;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sseClients = new Set<(event: any) => void>();
+  const hub = new SseHub();
   let lastSessions: string | null = null;
   // Ring buffer of last 100 hook events
   const hookEvents: HookEvent[] = [];
@@ -125,7 +125,7 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
       lastSessions = new Date().toISOString();
       sessionsCache = null; // invalidate on file change
     }
-    for (const send of sseClients) send(event);
+    hub.broadcast(event);
   });
 
   fastify.get('/health', async () => {
@@ -141,7 +141,7 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
     return {
       status: 'ok',
       modes: { live: hasLive, plan: hasPlan },
-      connectedClients: sseClients.size,
+      connectedClients: hub.clientCount,
       lastSessions,
       autoCommit,
     };
@@ -159,16 +159,9 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
     const send = (event: WatchEvent) => {
       reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
     };
-    sseClients.add(send);
+    const ping = () => { reply.raw.write(`: ping\n\n`); };
 
-    const pingInterval = setInterval(() => {
-      reply.raw.write(`: ping\n\n`);
-    }, 30000);
-
-    _request.raw.on('close', () => {
-      sseClients.delete(send);
-      clearInterval(pingInterval);
-    });
+    hub.addClient(send, ping, (handler) => _request.raw.on('close', handler));
 
     await new Promise(() => {});
   });
@@ -329,7 +322,7 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
       dismissed.add(key);
       saveDismissed(claudeDir, dismissed);
       sessionsCache = null;
-      for (const send of sseClients) send({ type: 'sessions', timestamp: new Date().toISOString() });
+      hub.broadcast({ type: 'sessions', timestamp: new Date().toISOString() });
       return reply.send({ ok: true });
     }
   );
@@ -348,7 +341,7 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
     };
     hookEvents.push(hookEvent);
     if (hookEvents.length > 100) hookEvents.shift();
-    for (const send of sseClients) send(hookEvent);
+    hub.broadcast(hookEvent);
 
     // PreCompact: save task state + context snapshot + auto-commit
     if (hookEvent.event === 'PreCompact') {
