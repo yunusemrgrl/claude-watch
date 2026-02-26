@@ -106,6 +106,7 @@ export interface HealthResponse {
   };
   connectedClients?: number;
   lastSessions?: string | null;
+  autoCommit?: boolean;
 }
 
 // Insights types

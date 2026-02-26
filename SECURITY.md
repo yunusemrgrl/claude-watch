@@ -1,5 +1,70 @@
 # Security Policy
 
+## Threat Model
+
+claudedash is a **local developer tool**. It runs on your machine, reads your `~/.claude/` files, and exposes a local HTTP server. Understanding the threat model helps you use it safely.
+
+### Safe: Localhost-only (default)
+
+```bash
+claudedash start  # binds to 127.0.0.1 only
+```
+
+Default configuration binds to `127.0.0.1`. Only processes on your local machine can connect. No token needed — the network is your protection.
+
+**Risk:** Low. Only local processes can reach the server.
+
+### Risky: Network-exposed without a token
+
+```bash
+claudedash start --host 0.0.0.0  # ❌ refused — token required
+```
+
+**As of v1.1.30+, claudedash refuses to start with `--host 0.0.0.0` (or any non-loopback address) unless `--token` is provided.**
+
+If this check were bypassed, anyone on your network could:
+- Read all your Claude session data and tool call history
+- Read your cost/billing information
+- POST to `/hook` which runs `git` commands in your working directory
+- POST to `/log` which writes to your `execution.log`
+
+**Risk:** High if no token. The `/hook` endpoint is particularly dangerous as it can trigger `git add -A && git commit` (when `autoCommit` is enabled in config).
+
+### Recommended: Token + tunnel for team sharing
+
+```bash
+# Generate a strong random token
+claudedash start --token $(openssl rand -hex 16)
+
+# Use a tunnel — never expose raw --host 0.0.0.0 to the internet
+ngrok http 4317
+```
+
+Token is validated via `Authorization: Bearer <token>` header only. Query-string tokens (`?token=`) are **not supported** — they appear in server logs, browser history, and proxy access logs.
+
+### Hardening Checklist for LAN / Team Use
+
+- [ ] Always use `--token` when `--host` is not localhost
+- [ ] Use a reverse proxy (nginx, caddy) with HTTPS for internet-facing deployments
+- [ ] Rotate token regularly (`openssl rand -hex 16`)
+- [ ] Keep `autoCommit` disabled (default) unless you understand the implications
+- [ ] Do not expose port 4317 directly to the internet — use a tunnel or VPN
+
+### API Endpoints and Their Risk Level
+
+| Endpoint | Risk | Notes |
+|----------|------|-------|
+| `GET /sessions`, `GET /cost`, etc. | Read-only | Leaks session/cost data if exposed |
+| `POST /hook` | **Critical** | Can run git commands when `autoCommit: true` |
+| `POST /log` | Medium | Writes to `execution.log` |
+| `PUT /queue` | Medium | Writes to `queue.md` |
+| `PUT /claudemd` | **High** | Writes to `CLAUDE.md` files |
+| `DELETE /snapshots/:hash` | Low | Deletes a snapshot file |
+
+→ See [docs/compatibility.md](docs/compatibility.md) for full file access list.
+
+---
+
 ## Supported Versions
 
 | Version | Supported |

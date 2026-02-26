@@ -61,13 +61,12 @@ export async function startServer(options: ServerOptions): Promise<void> {
       if (!isApi) return;
 
       const authHeader = request.headers['authorization'];
-      const queryToken = (request.query as Record<string, string>)['token'];
       const provided = authHeader?.startsWith('Bearer ')
         ? authHeader.slice(7)
-        : queryToken;
+        : undefined;
 
       if (provided !== token) {
-        return reply.code(401).send({ error: 'Unauthorized' });
+        return reply.code(401).send({ error: 'Unauthorized. Use Authorization: Bearer <token>' });
       }
     });
   }

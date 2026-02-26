@@ -645,12 +645,12 @@ const TOOL_EMOJI: Record<string, string> = {
   Grep: "🔎", Task: "🤖", WebFetch: "🌐", WebSearch: "🔍", TodoWrite: "📋",
 };
 
-function HookFeedSection({ events, hasHooks }: { events: HookEvent[]; hasHooks: boolean }) {
+function HookFeedSection({ events, hasHooks, autoCommit }: { events: HookEvent[]; hasHooks: boolean; autoCommit: boolean }) {
   if (!hasHooks) {
     return (
       <div className="bg-card border border-border rounded-lg p-5 text-center">
         <ZapIcon className="size-8 mx-auto mb-2 text-muted-foreground/30" />
-        <p className="text-sm text-muted-foreground mb-2">No hook events yet</p>
+        <p className="text-sm text-muted-foreground mb-2">Hooks not installed</p>
         <p className="text-[11px] text-muted-foreground/60 mb-3">
           Install hooks for real-time tool event streaming:
         </p>
@@ -659,16 +659,35 @@ function HookFeedSection({ events, hasHooks }: { events: HookEvent[]; hasHooks: 
     );
   }
 
+  if (events.length === 0) {
+    return (
+      <div className="bg-card border border-border rounded-lg p-5 text-center">
+        <ZapIcon className="size-8 mx-auto mb-2 text-muted-foreground/30" />
+        <p className="text-sm text-muted-foreground mb-2">Hooks installed — waiting for events</p>
+        <p className="text-[11px] text-muted-foreground/60">
+          Events appear here when Claude Code runs a tool call.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-card border border-border rounded-lg p-5">
-      <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-        Live Tool Events ({events.length})
-      </h4>
+      <div className="flex items-center gap-2 mb-3">
+        <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+          Live Tool Events ({events.length})
+        </h4>
+        {autoCommit && (
+          <span className="text-[10px] font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded">
+            Auto-commit: ON
+          </span>
+        )}
+      </div>
       <div className="space-y-1 max-h-64 overflow-y-auto">
         {events.slice(0, 50).map((e) => (
           <div key={e.receivedAt} className="flex items-center gap-2 text-[11px] py-0.5">
-            <span className="shrink-0">{TOOL_EMOJI[e.tool ?? ""] ?? "🔧"}</span>
-            <span className="font-medium text-foreground">{e.tool ?? e.event}</span>
+            <span className="shrink-0">{TOOL_EMOJI[e.tool || ""] ?? "🔧"}</span>
+            <span className="font-medium text-foreground">{e.tool || e.event}</span>
             {e.session && <span className="text-muted-foreground/50 font-mono">{e.session.slice(0, 6)}</span>}
             <span className="ml-auto text-muted-foreground/40 shrink-0">
               {new Date(e.receivedAt).toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
@@ -694,6 +713,7 @@ export function ActivityView() {
   const [billingBlock, setBillingBlock] = useState<BillingBlock | null>(null);
   const [hookEvents, setHookEvents] = useState<HookEvent[]>([]);
   const [hasHooks, setHasHooks] = useState(false);
+  const [autoCommit, setAutoCommit] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "quality" | "tools" | "history" | "hooks">("overview");
@@ -725,9 +745,10 @@ export function ActivityView() {
       if (historyRes.ok) setHistory(await historyRes.json() as HistoryResponse);
       if (billingRes.ok) setBillingBlock(await billingRes.json() as BillingBlock);
       if (hookRes.ok) {
-        const hookData = await hookRes.json() as { events: HookEvent[] };
+        const hookData = await hookRes.json() as { events: HookEvent[]; autoCommit?: boolean; hooksInstalled?: boolean };
         setHookEvents(hookData.events);
-        setHasHooks(hookData.events.length > 0);
+        setHasHooks(hookData.hooksInstalled ?? hookData.events.length > 0);
+        setAutoCommit(hookData.autoCommit ?? false);
       }
       if (!usageRes.ok && !sessionsRes.ok) setError(true);
     } catch {
@@ -942,7 +963,7 @@ export function ActivityView() {
           )}
 
           {activeTab === "hooks" && (
-            <HookFeedSection events={hookEvents} hasHooks={hasHooks} />
+            <HookFeedSection events={hookEvents} hasHooks={hasHooks} autoCommit={autoCommit} />
           )}
         </div>
       </ScrollArea>

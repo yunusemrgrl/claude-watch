@@ -20,7 +20,11 @@ program
 program
   .command('init')
   .description('Initialize claudedash in current directory')
-  .action(() => {
+  .option('--minimal', 'Create only empty queue.md and workflow.md (no opinionated templates)')
+  .option('--template <name>', 'Template preset: minimal | default | team', 'default')
+  .action((opts: { minimal?: boolean; template?: string }) => {
+    // --minimal is shorthand for --template minimal
+    const template = opts.minimal ? 'minimal' : (opts.template ?? 'default');
     const claudeWatchDir = join(process.cwd(), '.claudedash');
 
     // Create .claudedash/ directory
@@ -33,28 +37,18 @@ program
       mkdirSync(claudeWatchDir);
       console.log('✓ Created .claudedash/');
 
-      // Create queue.md with realistic example
-      const queueTemplate = `# Slice S1
-
-## S1-T1
-Area: Setup
-Depends: -
-Description: Initialize project structure and install dependencies
-AC: Project builds and all linters pass
-
-## S1-T2
-Area: Core
-Depends: S1-T1
-Description: Implement core feature
-AC: Feature works end-to-end with happy path
-
-## S1-T3
-Area: Test
-Depends: S1-T1, S1-T2
-Description: Add integration tests for core feature
-AC: All tests pass, edge cases covered
-`;
-      writeFileSync(join(claudeWatchDir, 'queue.md'), queueTemplate);
+      // Create queue.md — content depends on template choice
+      let queueContent = '';
+      if (template === 'minimal') {
+        // Empty queue for users who want a blank slate
+        queueContent = '# Tasks\n';
+      } else if (template === 'team') {
+        queueContent = `# Slice S1 — Foundation\n\n## S1-T1\nArea: Setup\nPriority: critical\nDepends: -\nDescription: Initialize project structure, install dependencies, configure linting and CI.\nAC: Project builds, linters pass, CI pipeline green.\n\n## S1-T2\nArea: Backend\nPriority: high\nDepends: S1-T1\nDescription: Implement core feature with full error handling and logging.\nAC: Feature works end-to-end, happy path and error cases covered.\n\n## S1-T3\nArea: Test\nPriority: high\nDepends: S1-T1, S1-T2\nDescription: Add unit + integration tests. Minimum 80% branch coverage.\nAC: All tests pass. Coverage report shows ≥80%.\n\n## S1-T4\nArea: Review\nPriority: medium\nDepends: S1-T2, S1-T3\nDescription: Code review checkpoint. Check for security issues, performance, and accessibility.\nAC: Review complete. All critical findings addressed.\n`;
+      } else {
+        // default
+        queueContent = `# Slice S1\n\n## S1-T1\nArea: Setup\nDepends: -\nDescription: Initialize project structure and install dependencies\nAC: Project builds and all linters pass\n\n## S1-T2\nArea: Core\nDepends: S1-T1\nDescription: Implement core feature\nAC: Feature works end-to-end with happy path\n\n## S1-T3\nArea: Test\nDepends: S1-T1, S1-T2\nDescription: Add integration tests for core feature\nAC: All tests pass, edge cases covered\n`;
+      }
+      writeFileSync(join(claudeWatchDir, 'queue.md'), queueContent);
       console.log('✓ Created queue.md');
 
       // Create empty execution.log
@@ -178,7 +172,8 @@ If no READY tasks remain, stop and report summary.
 6. Use \`new Date().toISOString()\` for timestamps.
 7. Use TodoWrite to track progress — the user monitors the live dashboard.
 `;
-      writeFileSync(join(claudeWatchDir, 'workflow.md'), workflowTemplate);
+      const finalWorkflow = template === 'minimal' ? '# Workflow\n\nAdd your agent execution protocol here.\n' : workflowTemplate;
+      writeFileSync(join(claudeWatchDir, 'workflow.md'), finalWorkflow);
       console.log('✓ Created workflow.md');
 
       // Create CLAUDE.md snippet file
@@ -423,6 +418,7 @@ program
   .option('--host <host>', 'Bind host', '127.0.0.1')
   .option('--no-bell', 'Disable terminal bell on task alerts')
   .option('--token <secret>', 'Require Bearer token for all API requests (reads CLAUDEDASH_TOKEN env var if not provided)')
+  .option('--auto-commit', 'Enable automatic git commit on PreCompact hook (opt-in; default: off)')
   .action(async (opts) => {
     const claudeDir = opts.claudeDir;
     const claudeWatchDir = join(process.cwd(), '.claudedash');
@@ -438,7 +434,7 @@ program
       process.exit(1);
     }
 
-    // Read port from config if plan mode available, otherwise use CLI option
+    // Read port and autoCommit from config if plan mode available, otherwise use CLI option
     let port = parseInt(opts.port, 10);
     if (hasPlan) {
       const configPath = join(claudeWatchDir, 'config.json');
@@ -451,6 +447,16 @@ program
           if (config.port && opts.port === '4317') {
             port = config.port;
           }
+          // --auto-commit CLI flag overrides config; write back if flag was set
+          if (opts.autoCommit && !config.autoCommit) {
+            config.autoCommit = true;
+            await import('fs').then(fs =>
+              fs.promises.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8')
+            );
+          }
+          if (config.autoCommit) {
+            console.log('⚡ Auto-commit on PreCompact: enabled');
+          }
         } catch { /* use default port */ }
       }
     }
@@ -459,12 +465,22 @@ program
     const isLocalhost = host === '127.0.0.1' || host === 'localhost' || host === '::1';
     const url = `http://${isLocalhost ? 'localhost' : host}:${port}`;
 
+    const token = (opts.token as string | undefined) ?? process.env.CLAUDEDASH_TOKEN;
+
     if (!isLocalhost) {
+      if (!token) {
+        console.error('❌ Security: --token is required when --host is not localhost.');
+        console.error('   Exposing claudedash without a token allows unauthenticated access to');
+        console.error('   endpoints that can run git commands and read your session data.');
+        console.error('');
+        console.error('   Fix: claudedash start --host ' + host + ' --token <your-secret>');
+        console.error('   Or:  CLAUDEDASH_TOKEN=<your-secret> claudedash start --host ' + host);
+        process.exit(1);
+      }
       console.log(`⚠️  Server exposed to network on ${host}:${port}`);
     }
 
-    const token = (opts.token as string | undefined) ?? process.env.CLAUDEDASH_TOKEN;
-    if (token) console.log('🔒 Token authentication enabled');
+    if (token) console.log('🔒 Token authentication enabled (Authorization: Bearer)');
 
     try {
       await startServer({
@@ -1059,7 +1075,7 @@ program
       }
 
       const hookCmd = (event: string) =>
-        `curl -sf -X POST http://localhost:${port}/hook -H 'Content-Type: application/json' -d '{"event":"${event}","tool":"$CLAUDE_TOOL_NAME","session":"$CLAUDE_SESSION_ID","cwd":"$CLAUDE_CWD"}' || true`;
+        `curl -sf -X POST http://localhost:${port}/hook -H 'Content-Type: application/json' -d "{\"event\":\"${event}\",\"tool\":\"$CLAUDE_TOOL_NAME\",\"session\":\"$CLAUDE_SESSION_ID\",\"cwd\":\"$CLAUDE_CWD\"}" || true`;
 
       const hooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
 

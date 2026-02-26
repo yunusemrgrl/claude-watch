@@ -1,6 +1,65 @@
 import type { FastifyInstance } from 'fastify';
-import { existsSync, readFileSync, writeFileSync, appendFileSync, readdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, appendFileSync, readdirSync, openSync, readSync, fstatSync, closeSync } from 'fs';
 import { join } from 'path';
+
+/**
+ * Read only the last `lineCount` lines of a file without loading the entire file.
+ * Uses backward seek from EOF scanning for newlines.
+ * Also returns the total estimated line count (based on full scan only when needed).
+ */
+function tailRead(filePath: string, lineCount: number): { lines: string[]; totalLines: number } {
+  let fd = -1;
+  try {
+    fd = openSync(filePath, 'r');
+    const stat = fstatSync(fd);
+    const fileSize = stat.size;
+
+    if (fileSize === 0) return { lines: [], totalLines: 0 };
+
+    // Read in chunks from the end, collecting newlines
+    const CHUNK = 65536; // 64KB
+    let remaining = fileSize;
+    let linesFound = 0;
+    let cutoffPos = fileSize;
+    let totalNewlines = 0;
+
+    // Phase 1: scan from end to find cutoff position for lineCount lines
+    while (remaining > 0 && linesFound < lineCount) {
+      const readSize = Math.min(CHUNK, remaining);
+      remaining -= readSize;
+      const buf = Buffer.allocUnsafe(readSize);
+      readSync(fd, buf, 0, readSize, remaining);
+      for (let i = readSize - 1; i >= 0; i--) {
+        if (buf[i] === 0x0a) { // '\n'
+          linesFound++;
+          if (linesFound === lineCount) {
+            cutoffPos = remaining + i + 1;
+            break;
+          }
+        }
+      }
+    }
+
+    // Phase 2: count total lines (scan rest of file for accurate count)
+    // We approximate: count newlines in already-scanned portion plus estimate remainder
+    // For simplicity, report linesFound + rough estimate from size ratio
+    const scannedBytes = fileSize - remaining;
+    const density = scannedBytes > 0 ? linesFound / scannedBytes : 0;
+    totalNewlines = Math.round(density * fileSize);
+
+    // Phase 3: read from cutoffPos to end
+    const readLen = fileSize - cutoffPos;
+    const content = Buffer.allocUnsafe(readLen);
+    readSync(fd, content, 0, readLen, cutoffPos);
+
+    const lines = content.toString('utf-8').split('\n').filter(l => l.trim());
+    return { lines, totalLines: Math.max(totalNewlines, lines.length) };
+  } catch {
+    return { lines: [], totalLines: 0 };
+  } finally {
+    if (fd >= 0) closeSync(fd);
+  }
+}
 import { execFileSync } from 'child_process';
 import { readSessions } from '../../core/todoReader.js';
 import { buildContextHealth } from '../../core/contextHealth.js';
@@ -72,11 +131,19 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
   fastify.get('/health', async () => {
     const hasLive = existsSync(join(claudeDir, 'tasks')) || existsSync(join(claudeDir, 'todos'));
     const hasPlan = planDir ? existsSync(join(planDir, 'queue.md')) : false;
+    let autoCommit = false;
+    if (planDir) {
+      try {
+        const cfg = JSON.parse(readFileSync(join(planDir, 'config.json'), 'utf-8')) as Record<string, unknown>;
+        autoCommit = cfg.autoCommit === true;
+      } catch { /* ignore */ }
+    }
     return {
       status: 'ok',
       modes: { live: hasLive, plan: hasPlan },
       connectedClients: sseClients.size,
       lastSessions,
+      autoCommit,
     };
   });
 
@@ -195,11 +262,7 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
     if (!jsonlPath) return reply.code(404).send({ error: 'Session JSONL not found' });
 
     try {
-      const raw = readFileSync(jsonlPath, 'utf-8');
-      const allLines = raw.split('\n').filter(l => l.trim());
-      // Only read last 500 lines to avoid OOM on huge files
-      const lines = allLines.slice(-500);
-      const messageCount = allLines.length;
+      const { lines, totalLines: messageCount } = tailRead(jsonlPath, 500);
 
       let lastUserPrompt: string | null = null;
       let lastAssistantSummary: string | null = null;
@@ -277,7 +340,7 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
     const hookEvent: HookEvent = {
       type: 'hook',
       event: typeof body.event === 'string' ? body.event : 'unknown',
-      tool: typeof body.tool === 'string' ? body.tool : undefined,
+      tool: typeof body.tool === 'string' && body.tool ? body.tool : undefined,
       session: typeof body.session === 'string' ? body.session : undefined,
       cwd: typeof body.cwd === 'string' ? body.cwd : undefined,
       receivedAt: new Date().toISOString(),
@@ -292,13 +355,22 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
       const snapshotCwd = (hookEvent.cwd as string | undefined) ?? (planDir ? join(planDir, '..') : process.cwd());
       const snapshotDir = planDir ?? join(snapshotCwd, '.claudedash');
 
-      // 1. Auto git commit (non-fatal — silently skipped if nothing to commit)
+      // 1. Auto git commit — only if autoCommit is explicitly enabled in config.json
       let commitMade = false;
-      try {
-        execFileSync('git', ['add', '-A'], { cwd: snapshotCwd, stdio: 'ignore' });
-        execFileSync('git', ['commit', '-m', 'chore: pre-compact auto-save [claudedash]'], { cwd: snapshotCwd, stdio: 'ignore' });
-        commitMade = true;
-      } catch { /* nothing to commit or not a git repo */ }
+      let autoCommitEnabled = false;
+      if (planDir) {
+        try {
+          const cfg = JSON.parse(readFileSync(join(planDir, 'config.json'), 'utf-8')) as Record<string, unknown>;
+          autoCommitEnabled = cfg.autoCommit === true;
+        } catch { /* config missing or malformed — default off */ }
+      }
+      if (autoCommitEnabled) {
+        try {
+          execFileSync('git', ['add', '-A'], { cwd: snapshotCwd, stdio: 'ignore' });
+          execFileSync('git', ['commit', '-m', 'chore: pre-compact auto-save [claudedash]'], { cwd: snapshotCwd, stdio: 'ignore' });
+          commitMade = true;
+        } catch { /* nothing to commit or not a git repo */ }
+      }
 
       // 2. Context snapshot (commit-tied if we just committed, else timestamped)
       try {
@@ -354,6 +426,30 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
 
   // GET /hook/events — returns the ring buffer of recent hook events
   fastify.get('/hook/events', async () => {
-    return { events: hookEvents.slice().reverse() };
+    let autoCommit = false;
+    if (planDir) {
+      try {
+        const cfg = JSON.parse(readFileSync(join(planDir, 'config.json'), 'utf-8')) as Record<string, unknown>;
+        autoCommit = cfg.autoCommit === true;
+      } catch { /* ignore */ }
+    }
+
+    // Check if hooks are installed in ~/.claude/settings.json
+    // (independent of whether any events have fired yet in this session)
+    let hooksInstalled = false;
+    try {
+      const settingsPath = join(claudeDir, 'settings.json');
+      if (existsSync(settingsPath)) {
+        const settings = JSON.parse(readFileSync(settingsPath, 'utf-8')) as Record<string, unknown>;
+        const hooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
+        const hasHook = (key: string) =>
+          (hooks[key] ?? []).some((h: unknown) =>
+            typeof h === 'object' && (JSON.stringify(h).includes('claudedash') || JSON.stringify(h).includes('/hook'))
+          );
+        hooksInstalled = hasHook('PostToolUse') || hasHook('Stop');
+      }
+    } catch { /* ignore */ }
+
+    return { events: hookEvents.slice().reverse(), autoCommit, hooksInstalled };
   });
 }

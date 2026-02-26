@@ -37,3 +37,10 @@ docs/dev-log.md
 
 # Auto-generated
 dashboard/tsconfig.tsbuildinfo
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

@@ -14,17 +14,30 @@
 
 You tell Claude Code: _"refactor the auth system."_ It says: _"on it."_
 
-Terminal scrolls. Minutes pass. Is it on step 3 of 12? Stuck in a loop? Already done?
+Terminal scrolls. Minutes pass. Is it on step 3 of 12? **Stuck in a loop? Already done? Context almost full?**
 
 **You have no idea.**
 
-claudedash fixes that. One command, zero config — a live dashboard for every Claude Code session.
+claudedash fixes that — **stuck detection + context overflow warning** in one command.
 
 ```bash
 npx -y claudedash@latest start
 ```
 
 Open `localhost:4317`. Watch your agent work.
+
+---
+
+## Who Is This For
+
+**This is for you if:**
+- You run Claude Code agents on long tasks (>5 minutes) and need visibility
+- You've lost work because context filled up and the agent went silent
+- You want structured task tracking with dependencies and acceptance criteria
+
+**This is NOT for you if:**
+- You only do short, single-turn Claude Code interactions
+- You need multi-user team infrastructure (this is a local-first developer tool)
 
 ---
 
@@ -201,7 +214,16 @@ claudedash start --token mysecret123
 CLAUDEDASH_TOKEN=mysecret123 claudedash start
 ```
 
-Team access: `http://your-host:4317?token=mysecret123`
+Team access — use `Authorization: Bearer` header:
+
+```bash
+# In browser via tunnel (recommended)
+ngrok http 4317
+# → Share the ngrok URL; token sent via header in the dashboard login prompt
+
+# Via curl / API clients
+curl -H "Authorization: Bearer mysecret123" http://your-host:4317/sessions
+```
 
 > **Tip:** Use a tunnel instead of exposing `--host 0.0.0.0`:
 >
@@ -209,6 +231,8 @@ Team access: `http://your-host:4317?token=mysecret123`
 > claudedash start --token $(openssl rand -hex 16)
 > ngrok http 4317
 > ```
+>
+> **Security:** `--host 0.0.0.0` requires `--token`. Token is validated via `Authorization: Bearer` header only — never via query string.
 
 ---
 
@@ -280,6 +304,13 @@ Tools: `get_queue`, `get_sessions`, `get_cost`, `get_history`, `log_task`, `crea
 | `POST /log`                 | Log task result                      |
 | `POST /plan/task`           | Add task to queue.md                 |
 | `POST /agent/register`      | Register an agent                    |
+
+---
+
+## Compatibility
+
+claudedash reads `~/.claude/` files directly — no server integration required.
+→ [docs/compatibility.md](docs/compatibility.md) — exact file paths, JSONL schema, and what breaks if Claude Code changes formats.
 
 ---
 

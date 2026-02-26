@@ -20,6 +20,8 @@ queue.md     ──────────────────────�
 
 See [`docs/architecture.md`](docs/architecture.md) for a detailed data flow diagram.
 
+**Important:** claudedash reads Claude Code's local files directly. See [`docs/compatibility.md`](docs/compatibility.md) for the exact file paths, JSONL schema fields, and what to do if formats change.
+
 ## Directory Map
 
 ```
