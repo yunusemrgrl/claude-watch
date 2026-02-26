@@ -42,13 +42,13 @@ export class HookService {
   /** Parse a raw POST /hook body into a HookEvent and add it to the ring buffer. */
   push(body: Record<string, unknown>): HookEvent {
     const hookEvent: HookEvent = {
+      ...body,
       type: 'hook',
       event: typeof body.event === 'string' ? body.event : 'unknown',
       tool: typeof body.tool === 'string' && body.tool ? body.tool : undefined,
       session: typeof body.session === 'string' ? body.session : undefined,
       cwd: typeof body.cwd === 'string' ? body.cwd : undefined,
       receivedAt: new Date().toISOString(),
-      ...body,
     };
     this.ring.push(hookEvent);
     if (this.ring.length > RING_SIZE) this.ring.shift();
