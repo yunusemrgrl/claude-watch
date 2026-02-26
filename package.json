@@ -51,7 +51,6 @@
     "fastify": "^5.7.4"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
     "@types/node": "^20.11.16",
     "@typescript-eslint/eslint-plugin": "^8.56.0",
     "@typescript-eslint/parser": "^8.56.0",
