@@ -7,6 +7,42 @@
 
 ---
 
+## Active Pivot — Slice S26: Control Plane Shift
+
+Triggered by: @docs/feedback1.md + @docs/feedback2.md
+
+### S26-T1 — API-first startup (UI optional)
+**Priority:** Critical  
+**Why:** "Ayrı dashboard" odaklı kullanım, agent yürütmeyi yönetmek yerine izlemeye kayıyor.  
+**What AI does:** `claudedash start` artık control plane API'yi başlatır; web UI `--open` ile opsiyonel açılır.
+
+### S26-T2 — Source adapter boundary
+**Priority:** High  
+**Why:** Tek sağlayıcı dosya formatına sıkı bağlılık kırılganlık yaratıyor.  
+**What AI does:** `--source` girişi ve `src/platform/source.ts` ile adapter sınırı tanımlanır (ilk sağlayıcı: `claude-code`).
+
+### S26-T3 — Mutating endpoint hardening
+**Priority:** High  
+**Why:** `/hook`, `/log`, `/plan/task`, `/agent/*` gibi yazan endpoint'ler abuse riskine açık.  
+**What AI does:** Bu endpoint'lere route-level rate limit eklenir.
+
+### S26-T4 — Positioning rewrite
+**Priority:** High  
+**Why:** Ürün algısı "dashboard toy" olmaktan çıkıp "agent control plane" olarak netleşmeli.  
+**What AI does:** README + CLI metinleri control plane diline çekilir; recovery + quality + safety öne alınır.
+
+### S26-T5 — Token auth UX completion
+**Priority:** Critical  
+**Why:** `--token` ile korunan sunucuda web UI kullanılabilir olmalı.  
+**What AI does:** `/auth/login` + `HttpOnly` cookie akışı, UI login ekranı.
+
+### S26-T6 — MCP secured-server access
+**Priority:** High  
+**Why:** MCP proxy, token korumalı claudedash sunucularına bağlanabilmeli.  
+**What AI does:** `claudedash mcp --token` seçeneği ve Authorization header forwarding.
+
+---
+
 ## What's Done (Slices S11–S19)
 
 All slices through S19 are complete per `execution.log`:

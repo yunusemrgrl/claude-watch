@@ -6,6 +6,22 @@
 
 ---
 
+## Pivot Addendum — 2026-02-26 (Hard Pivot)
+
+After reviewing @docs/feedback1.md and @docs/feedback2.md, product direction is updated:
+
+1. Do **not** abandon the project.
+2. Abandon "**dashboard-first**" positioning.
+3. Continue as "**local agent control plane**" with priorities:
+   - security hardening by default,
+   - recovery + quality guardrails,
+   - source adapter boundary for future multi-provider support,
+   - UI as optional companion, not the product center.
+
+Immediate implementation slice: **S26 (Control Plane Shift)**.
+
+---
+
 ## 1. Current Situation Summary
 
 claudedash has completed Slices S11–S19 (all DONE per execution.log). The product is feature-rich but has received two critical reviews exposing the following gaps:

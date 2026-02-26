@@ -1,6 +1,6 @@
 # claudedash
 
-**See exactly what your AI agent is doing — in real time.**
+**Local control plane for AI coding agents: recover, guard, and steer execution.**
 
 [![npm version](https://img.shields.io/npm/v/claudedash?color=00f5ff&labelColor=0f0f12)](https://www.npmjs.com/package/claudedash)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?labelColor=0f0f12)](https://opensource.org/licenses/MIT)
@@ -18,13 +18,20 @@ Terminal scrolls. Minutes pass. Is it on step 3 of 12? **Stuck in a loop? Alread
 
 **You have no idea.**
 
-claudedash fixes that — **stuck detection + context overflow warning** in one command.
+claudedash fixes that with a local control plane:
+- **State + safety first** (queue state, context risk, quality gates)
+- **Recovery first** (snapshot + recover)
+- **UI optional** (API-first, browser view when needed)
 
 ```bash
 npx -y claudedash@latest start
 ```
 
-Open `localhost:4317`. Watch your agent work.
+Need the web UI immediately?
+
+```bash
+npx -y claudedash@latest start --open
+```
 
 ---
 
@@ -47,6 +54,9 @@ Open `localhost:4317`. Watch your agent work.
 # Zero-install — always gets the latest version
 npx -y claudedash@latest start
 
+# Open the companion web UI (optional)
+npx -y claudedash@latest start --open
+
 # Install lifecycle hooks (recommended)
 claudedash hooks install
 
@@ -54,21 +64,20 @@ claudedash hooks install
 claudedash init
 ```
 
-That's it. The dashboard auto-detects your Claude sessions.
+That's it. The control plane auto-detects your Claude session files.
 
 ---
 
 ## Features
 
-- **Live Kanban board** — real-time task status from `~/.claude/tasks/`, updated via SSE within ~100ms
 - **Plan mode** — structured execution with dependencies, acceptance criteria, and blocked-task detection
-- **Context health** — token usage bar per session, warnings at 65% (warn) and 75% (critical)
-- **Quality gates** — lint / typecheck / test results per task with a full timeline history
-- **Worktrees** — map parallel agents across git branches, see dirty/ahead/behind at a glance
-- **Agent API** — `POST /log`, `POST /agent/register`, heartbeat, BLOCKED → instant browser push notification
-- **Hook integration** — PostToolUse/Stop/PreCompact/PostCompact hooks stream every tool call live
-- **Cost tracker** — 5-hour rolling billing block estimate per model, real-time
-- **MCP server** — `get_queue`, `get_sessions`, `get_cost`, `log_task` — Claude can query its own dashboard
+- **Context rollback** — snapshot + recover to restore code and execution context together
+- **Quality gates** — lint / typecheck / test results per task with full timeline history
+- **Context health** — token risk warnings at 65% (warn) / 75% (critical)
+- **Agent API** — `POST /log`, `POST /agent/register`, heartbeat, task automation endpoints
+- **Hook integration** — PostToolUse/Stop/PreCompact/PostCompact hooks stream live events
+- **Live session monitor** — optional web UI over `~/.claude/tasks/` + `~/.claude/todos/`
+- **MCP server** — `get_queue`, `get_sessions`, `get_cost`, `log_task` for agent self-query
 - **Zero infra** — no database, no cloud, reads files from `~/.claude/` directly
 
 ---
@@ -187,8 +196,10 @@ Follow .claudedash/workflow.md, start with S1-T1.
 
 | Command                             | Description                               |
 | ----------------------------------- | ----------------------------------------- |
-| `claudedash start`                  | Start dashboard (auto-detect modes)       |
+| `claudedash start`                  | Start control plane API (auto-detect modes) |
+| `claudedash start --open`           | Start API and open companion web UI       |
 | `claudedash start -p 3000`          | Custom port                               |
+| `claudedash start --source claude-code` | Select source adapter (current: claude-code) |
 | `claudedash start --token <secret>` | Enable auth token                         |
 | `claudedash init`                   | Init plan mode in current directory       |
 | `claudedash hooks install`          | Install PostToolUse/Stop/PreCompact hooks |
@@ -219,11 +230,13 @@ Team access — use `Authorization: Bearer` header:
 ```bash
 # In browser via tunnel (recommended)
 ngrok http 4317
-# → Share the ngrok URL; token sent via header in the dashboard login prompt
+# → Share the ngrok URL with trusted teammates; API access requires Bearer token
 
 # Via curl / API clients
 curl -H "Authorization: Bearer mysecret123" http://your-host:4317/sessions
 ```
+
+When you open the web UI with token auth enabled, claudedash shows a token sign-in screen and stores a short-lived auth cookie for browser requests.
 
 > **Tip:** Use a tunnel instead of exposing `--host 0.0.0.0`:
 >
@@ -275,10 +288,12 @@ The Snapshots tab in the dashboard shows all checkpoints with a one-click "Copy 
 
 ### MCP Server
 
-Claude can query its own dashboard:
+Claude can query its own control plane:
 
 ```bash
 claude mcp add claudedash -- npx -y claudedash@latest mcp
+# If your claudedash server uses --token:
+claude mcp add claudedash -- npx -y claudedash@latest mcp --token "$CLAUDEDASH_TOKEN"
 ```
 
 Tools: `get_queue`, `get_sessions`, `get_cost`, `get_history`, `log_task`, `create_task`, `register_agent`, `send_heartbeat`.
@@ -290,6 +305,8 @@ Tools: `get_queue`, `get_sessions`, `get_cost`, `get_history`, `log_task`, `crea
 | Endpoint                    | Description                          |
 | --------------------------- | ------------------------------------ |
 | `GET /health`               | Status, modes, connected clients     |
+| `POST /auth/login`          | Exchange token for browser auth cookie |
+| `POST /auth/logout`         | Clear browser auth cookie             |
 | `GET /sessions`             | All sessions with context health     |
 | `GET /sessions/:id/context` | Session JSONL summary                |
 | `GET /events`               | SSE stream                           |

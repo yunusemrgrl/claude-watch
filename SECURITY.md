@@ -30,6 +30,20 @@ If this check were bypassed, anyone on your network could:
 
 **Risk:** High if no token. The `/hook` endpoint is particularly dangerous as it can trigger `git add -A && git commit` (when `autoCommit` is enabled in config).
 
+### Built-in Abuse Controls
+
+claudedash includes global request limiting and additional stricter limits on mutating routes:
+- `/hook`: 30 req/min
+- `/plan/task`: 30 req/min
+- `/plan/task/:taskId`: 60 req/min
+- `/log`: 120 req/min
+- `/agent/register`: 30 req/min
+- `/agent/heartbeat`: 240 req/min
+- `/claudemd`: 30 req/min
+- `DELETE /snapshots/:hash`: 20 req/min
+
+These controls reduce accidental loops and scripted abuse on exposed instances.
+
 ### Recommended: Token + tunnel for team sharing
 
 ```bash
@@ -41,6 +55,7 @@ ngrok http 4317
 ```
 
 Token is validated via `Authorization: Bearer <token>` header only. Query-string tokens (`?token=`) are **not supported** — they appear in server logs, browser history, and proxy access logs.
+For web UI login, claudedash can issue a short-lived `HttpOnly` auth cookie after a successful `POST /auth/login`.
 
 ### Hardening Checklist for LAN / Team Use
 
@@ -57,7 +72,7 @@ Token is validated via `Authorization: Bearer <token>` header only. Query-string
 | `GET /sessions`, `GET /cost`, etc. | Read-only | Leaks session/cost data if exposed |
 | `POST /hook` | **Critical** | Can run git commands when `autoCommit: true` |
 | `POST /log` | Medium | Writes to `execution.log` |
-| `PUT /queue` | Medium | Writes to `queue.md` |
+| `POST /plan/task` | Medium | Appends new task blocks to `queue.md` |
 | `PUT /claudemd` | **High** | Writes to `CLAUDE.md` files |
 | `DELETE /snapshots/:hash` | Low | Deletes a snapshot file |
 
