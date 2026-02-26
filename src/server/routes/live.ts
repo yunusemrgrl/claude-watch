@@ -1,8 +1,9 @@
 import type { FastifyInstance } from 'fastify';
-import { existsSync, readFileSync, writeFileSync, appendFileSync, readdirSync, openSync, readSync, fstatSync, closeSync } from 'fs';
+import { existsSync, readdirSync, openSync, readSync, fstatSync, closeSync } from 'fs';
 import { join } from 'path';
 import { SseHub } from '../../services/SseHub.js';
 import { SessionService } from '../../services/SessionService.js';
+import { HookService } from '../../services/HookService.js';
 
 /**
  * Read only the last `lineCount` lines of a file without loading the entire file.
@@ -62,11 +63,7 @@ function tailRead(filePath: string, lineCount: number): { lines: string[]; total
     if (fd >= 0) closeSync(fd);
   }
 }
-import { execFileSync } from 'child_process';
-import { parseQueue } from '../../core/queueParser.js';
-import { parseLog } from '../../core/logParser.js';
-import { computeSnapshot } from '../../core/stateEngine.js';
-import { captureContextSnapshot, writeContextSnapshot } from '../../core/contextCapture.js';
+
 import type { WatchEvent } from '../watcher.js';
 import type { EventEmitter } from 'events';
 
@@ -76,23 +73,13 @@ export interface LiveRouteOptions {
   emitter: EventEmitter;
 }
 
-export interface HookEvent {
-  type: 'hook';
-  event: string;
-  tool?: string;
-  session?: string;
-  cwd?: string;
-  receivedAt: string;
-  [key: string]: unknown;
-}
 
 export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOptions): Promise<void> {
   const { claudeDir, planDir, emitter } = opts;
   const hub = new SseHub();
   const sessions = new SessionService(claudeDir);
+  const hooks = new HookService(claudeDir, planDir);
   let lastSessions: string | null = null;
-  // Ring buffer of last 100 hook events
-  const hookEvents: HookEvent[] = [];
 
   emitter.on('change', (event: WatchEvent) => {
     if (event.type === 'sessions') {
@@ -105,19 +92,12 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
   fastify.get('/health', async () => {
     const hasLive = existsSync(join(claudeDir, 'tasks')) || existsSync(join(claudeDir, 'todos'));
     const hasPlan = planDir ? existsSync(join(planDir, 'queue.md')) : false;
-    let autoCommit = false;
-    if (planDir) {
-      try {
-        const cfg = JSON.parse(readFileSync(join(planDir, 'config.json'), 'utf-8')) as Record<string, unknown>;
-        autoCommit = cfg.autoCommit === true;
-      } catch { /* ignore */ }
-    }
     return {
       status: 'ok',
       modes: { live: hasLive, plan: hasPlan },
       connectedClients: hub.clientCount,
       lastSessions,
-      autoCommit,
+      autoCommit: hooks.getAutoCommit(),
     };
   });
 
@@ -258,120 +238,21 @@ export async function liveRoutes(fastify: FastifyInstance, opts: LiveRouteOption
 
   // POST /hook — receives Claude Code hook events, fans out via SSE, stores in ring buffer
   fastify.post<{ Body: Record<string, unknown> }>('/hook', async (request) => {
-    const body = request.body ?? {};
-    const hookEvent: HookEvent = {
-      type: 'hook',
-      event: typeof body.event === 'string' ? body.event : 'unknown',
-      tool: typeof body.tool === 'string' && body.tool ? body.tool : undefined,
-      session: typeof body.session === 'string' ? body.session : undefined,
-      cwd: typeof body.cwd === 'string' ? body.cwd : undefined,
-      receivedAt: new Date().toISOString(),
-      ...body,
-    };
-    hookEvents.push(hookEvent);
-    if (hookEvents.length > 100) hookEvents.shift();
+    const hookEvent = hooks.push(request.body ?? {});
     hub.broadcast(hookEvent);
 
-    // PreCompact: save task state + context snapshot + auto-commit
-    if (hookEvent.event === 'PreCompact') {
-      const snapshotCwd = (hookEvent.cwd as string | undefined) ?? (planDir ? join(planDir, '..') : process.cwd());
-      const snapshotDir = planDir ?? join(snapshotCwd, '.claudedash');
-
-      // 1. Auto git commit — only if autoCommit is explicitly enabled in config.json
-      let commitMade = false;
-      let autoCommitEnabled = false;
-      if (planDir) {
-        try {
-          const cfg = JSON.parse(readFileSync(join(planDir, 'config.json'), 'utf-8')) as Record<string, unknown>;
-          autoCommitEnabled = cfg.autoCommit === true;
-        } catch { /* config missing or malformed — default off */ }
-      }
-      if (autoCommitEnabled) {
-        try {
-          execFileSync('git', ['add', '-A'], { cwd: snapshotCwd, stdio: 'ignore' });
-          execFileSync('git', ['commit', '-m', 'chore: pre-compact auto-save [claudedash]'], { cwd: snapshotCwd, stdio: 'ignore' });
-          commitMade = true;
-        } catch { /* nothing to commit or not a git repo */ }
-      }
-
-      // 2. Context snapshot (commit-tied if we just committed, else timestamped)
-      try {
-        const ctxSnap = await captureContextSnapshot({
-          focus: 'pre-compact auto-save',
-          cwd: snapshotCwd,
-          commit: commitMade,
-        });
-        writeContextSnapshot(ctxSnap, snapshotDir);
-      } catch { /* non-fatal */ }
-
-      // 3. compact-state.json for PostCompact restore
-      if (planDir) {
-        try {
-          const queuePath = join(planDir, 'queue.md');
-          const logPath = join(planDir, 'execution.log');
-          if (existsSync(queuePath)) {
-            const queueResult = parseQueue(readFileSync(queuePath, 'utf-8'));
-            let logResult = parseLog('');
-            if (existsSync(logPath)) logResult = parseLog(readFileSync(logPath, 'utf-8'));
-            const stateSnap = computeSnapshot(queueResult.tasks, logResult.events);
-            const readyTasks = stateSnap.tasks.filter(t => t.status === 'READY').map(t => t.id);
-            const state = {
-              compactedAt: hookEvent.receivedAt,
-              sessionId: hookEvent.session ?? null,
-              summary: stateSnap.summary,
-              readyTasks,
-            };
-            writeFileSync(join(planDir, 'compact-state.json'), JSON.stringify(state, null, 2), 'utf-8');
-          }
-        } catch { /* non-fatal */ }
-      }
-    }
-
-    // PostCompact: append restore reminder to CLAUDE.md
-    if (hookEvent.event === 'PostCompact' && planDir) {
-      try {
-        const statePath = join(planDir, 'compact-state.json');
-        if (existsSync(statePath)) {
-          const state = JSON.parse(readFileSync(statePath, 'utf-8')) as Record<string, unknown>;
-          const claudeMdPath = join(planDir, 'CLAUDE.md');
-          const summary = state.summary as Record<string, number> | undefined;
-          const ready = summary?.ready ?? 0;
-          const done = summary?.done ?? 0;
-          const note = `\n\n> **[compact-restore ${hookEvent.receivedAt}]** Context was compacted. State: ${done} DONE, ${ready} READY. Read \`.claudedash/compact-state.json\` for full task list.\n`;
-          appendFileSync(claudeMdPath, note, 'utf-8');
-        }
-      } catch { /* non-fatal */ }
-    }
+    if (hookEvent.event === 'PreCompact') await hooks.handlePreCompact(hookEvent);
+    if (hookEvent.event === 'PostCompact') hooks.handlePostCompact(hookEvent);
 
     return { ok: true, receivedAt: hookEvent.receivedAt };
   });
 
   // GET /hook/events — returns the ring buffer of recent hook events
   fastify.get('/hook/events', async () => {
-    let autoCommit = false;
-    if (planDir) {
-      try {
-        const cfg = JSON.parse(readFileSync(join(planDir, 'config.json'), 'utf-8')) as Record<string, unknown>;
-        autoCommit = cfg.autoCommit === true;
-      } catch { /* ignore */ }
-    }
-
-    // Check if hooks are installed in ~/.claude/settings.json
-    // (independent of whether any events have fired yet in this session)
-    let hooksInstalled = false;
-    try {
-      const settingsPath = join(claudeDir, 'settings.json');
-      if (existsSync(settingsPath)) {
-        const settings = JSON.parse(readFileSync(settingsPath, 'utf-8')) as Record<string, unknown>;
-        const hooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
-        const hasHook = (key: string) =>
-          (hooks[key] ?? []).some((h: unknown) =>
-            typeof h === 'object' && (JSON.stringify(h).includes('claudedash') || JSON.stringify(h).includes('/hook'))
-          );
-        hooksInstalled = hasHook('PostToolUse') || hasHook('Stop');
-      }
-    } catch { /* ignore */ }
-
-    return { events: hookEvents.slice().reverse(), autoCommit, hooksInstalled };
+    return {
+      events: hooks.getEvents(),
+      autoCommit: hooks.getAutoCommit(),
+      hooksInstalled: hooks.getHooksInstalled(),
+    };
   });
 }
