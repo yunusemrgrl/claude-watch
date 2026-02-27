@@ -1,3 +1,19 @@
+[<image-card alt="Deprecated" src="https://img.shields.io/badge/status-deprecated-red.svg" ></image-card>](https://github.com/siteboon/claudecodeui)
+# claudedash (Deprecated)
+
+## Important Update: This project is now deprecated!
+
+claudedash was an experimental dashboard for Claude Code, featuring real-time Kanban, MCP server for self-querying, git snapshot/recover, quality gates, and more. However, I've decided to integrate its best features into a more mature and actively maintained project: [siteboon/claudecodeui](https://github.com/siteboon/claudecodeui).
+
+Why the switch?
+- **Better community & features**: siteboon/claudecodeui has 7k+ stars, desktop/mobile support, and already includes similar tools like TaskMaster Kanban and Git Explorer.
+- **Benefits for you**: Switch to siteboon for a more robust experience with ongoing updates.
+
+If you're using claudedash, migrate now! Install siteboon/claudecodeui via `npm i claudecodeui` or check their README for setup.
+
+Thanks for the support – let's build better AI tools together! 🚀
+
+
 # claudedash
 
 **Local control plane for AI coding agents: recover, guard, and steer execution.**
